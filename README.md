@@ -1,1 +1,0 @@
-# project-hospital-management-react-native
