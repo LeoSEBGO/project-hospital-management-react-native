@@ -102,7 +102,8 @@ export interface RendezVous {
   modifie_par_id?: number;
   rang: number;
   motif?: string;
-  date_rdv?: string;
+  date_rendez_vous?: string;
+  heure_rendez_vous?: string;
   actif: boolean;
   ajoute_le: string;
   modifie_le: string;
@@ -113,11 +114,32 @@ export interface RendezVous {
   statut?: Statut;
 }
 
+export interface RendezVousHistorique {
+  id: number;
+  rendez_vous_id: number;
+  patient_id: number;
+  service_id: number;
+  statut_id: number;
+  ajoute_par_id?: number;
+  modifie_par_id?: number;
+  rang: number;
+  motif?: string;
+  date_rendez_vous?: string;
+  heure_rendez_vous?: string;
+  actif: boolean;
+  action: 'CREATED' | 'UPDATED' | 'CANCELLED' | 'COMPLETED';
+  commentaire?: string;
+  created_at: string;
+  updated_at: string;
+  service?: Service;
+  statut?: Statut;
+}
+
 export interface CreateRendezVousRequest {
   service_id: number;
   date_rendez_vous: string;
   heure_rendez_vous: string;
-  commentaire?: string;
+  motif?: string;
 }
 
 export interface UpdateRendezVousRequest {
@@ -167,6 +189,7 @@ export interface RealTimeNotification {
   data?: any;
   read: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 class ApiService {
@@ -262,8 +285,7 @@ class ApiService {
   // Récupérer les informations complètes du patient connecté
   async getCurrentPatient(): Promise<ApiResponse<Patient>> {
     try {
-      const timestamp = Date.now();
-      const response = await this.api.get(getApiUrl(`${API_CONFIG.ENDPOINTS.PATIENTS.ME}?t=${timestamp}`));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.ME));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -355,7 +377,7 @@ class ApiService {
   // Méthodes pour la queue
   async getQueuePosition(): Promise<ApiResponse<QueuePosition>> {
     try {
-      const response = await this.api.get(getApiUrl('/patients/me/queue-position'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.POSITION));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -364,7 +386,27 @@ class ApiService {
 
   async getQueueStats(): Promise<ApiResponse<QueueStats>> {
     try {
-      const response = await this.api.get(getApiUrl('/patients/me/queue-stats'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.STATS));
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Rejoindre la file d'attente
+  async joinQueue(): Promise<ApiResponse<void>> {
+    try {
+      const response = await this.api.post(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.JOIN));
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Quitter la file d'attente
+  async leaveQueue(): Promise<ApiResponse<void>> {
+    try {
+      const response = await this.api.post(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.LEAVE));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -374,7 +416,7 @@ class ApiService {
   // Méthodes pour les notifications
   async getNotifications(): Promise<ApiResponse<RealTimeNotification[]>> {
     try {
-      const response = await this.api.get(getApiUrl('/patients/me/notifications'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS.LIST));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -383,7 +425,7 @@ class ApiService {
 
   async markNotificationAsRead(notificationId: number): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.patch(getApiUrl(`/patients/me/notifications/${notificationId}/read`));
+      const response = await this.api.patch(getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS.MARK_READ(notificationId)));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -392,7 +434,7 @@ class ApiService {
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.patch(getApiUrl('/patients/me/notifications/read-all'));
+      const response = await this.api.patch(getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -403,6 +445,29 @@ class ApiService {
   async getRendezVous(): Promise<ApiResponse<RendezVous[]>> {
     try {
       const response = await this.api.get(getApiUrl('/patients/me/rendez-vous'));
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getRendezVousActifs(): Promise<ApiResponse<RendezVous[]>> {
+    try {
+      const response = await this.api.get(getApiUrl('/patients/me/rendez-vous/actifs'));
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getHorairesDisponibles(serviceId: number, date: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.api.get(getApiUrl('/patients/me/rendez-vous/horaires-disponibles'), {
+        params: {
+          service_id: serviceId,
+          date_rendez_vous: date
+        }
+      });
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -436,9 +501,21 @@ class ApiService {
     }
   }
 
-  async cancelRendezVous(id: number): Promise<ApiResponse<void>> {
+  async cancelRendezVous(id: number, raison?: string): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.delete(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.DELETE(id)));
+      const response = await this.api.delete(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.DELETE(id)), {
+        data: { raison_annulation: raison }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  // Récupérer l'historique des rendez-vous
+  async getRendezVousHistorique(): Promise<ApiResponse<RendezVousHistorique[]>> {
+    try {
+      const response = await this.api.get(getApiUrl('/rendez-vous/historique'));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);

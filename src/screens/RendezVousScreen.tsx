@@ -137,16 +137,47 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
 
   const cancelRendezVous = async (id: number) => {
     try {
-      const response = await apiService.cancelRendezVous(id);
+      console.log(`[RENDEZ_VOUS] Tentative d'annulation du rendez-vous ${id}`);
+      
+      const response = await apiService.cancelRendezVous(id, 'Annulé par le patient');
       
       if (response.success) {
-        Alert.alert('Succès', 'Rendez-vous annulé avec succès');
-        loadRendezVous(); // Recharger la liste
+        Alert.alert(
+          'Succès', 
+          'Rendez-vous annulé avec succès',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                console.log('[RENDEZ_VOUS] Rechargement de la liste après annulation');
+                loadRendezVous(); // Recharger la liste
+              }
+            }
+          ]
+        );
       } else {
         Alert.alert('Erreur', response.message || 'Impossible d\'annuler le rendez-vous');
       }
     } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      console.error('[RENDEZ_VOUS] Erreur lors de l\'annulation:', error);
+      
+      let errorMessage = 'Erreur lors de l\'annulation du rendez-vous';
+      
+      if (error.message) {
+        if (error.message.includes('déjà été annulé')) {
+          errorMessage = 'Ce rendez-vous a déjà été annulé';
+        } else if (error.message.includes('pas autorisé')) {
+          errorMessage = 'Vous n\'êtes pas autorisé à annuler ce rendez-vous';
+        } else if (error.message.includes('ne peut pas être annulé')) {
+          errorMessage = error.message;
+        } else if (error.message.includes('connexion réseau')) {
+          errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     }
   };
 
@@ -180,7 +211,8 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
     }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'Date à définir';
     return new Date(dateString).toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
@@ -188,7 +220,8 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
     });
   };
 
-  const formatTime = (timeString: string) => {
+  const formatTime = (timeString: string | undefined) => {
+    if (!timeString) return 'Heure à définir';
     return timeString;
   };
 
@@ -200,19 +233,35 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
   };
 
   const renderRendezVousItem = ({ item }: { item: RendezVous }) => (
-    <View style={styles.rendezVousCard}>
+    <View style={[
+      styles.rendezVousCard,
+      !item.actif && styles.rendezVousCardInactive
+    ]}>
       <View style={styles.rendezVousHeader}>
         <View style={styles.serviceInfo}>
           <View style={styles.serviceHeader}>
             <MaterialIcons name="local-hospital" size={20} color="#3498db" />
-            <Text style={styles.serviceName}>{item.service?.nom || 'Service inconnu'}</Text>
+            <Text style={[
+              styles.serviceName,
+              !item.actif && styles.serviceNameInactive
+            ]}>
+              {item.service?.nom || 'Service inconnu'}
+            </Text>
+            {!item.actif && (
+              <View style={styles.cancelledBadge}>
+                <Text style={styles.cancelledBadgeText}>ANNULÉ</Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.serviceDescription}>
+          <Text style={[
+            styles.serviceDescription,
+            !item.actif && styles.serviceDescriptionInactive
+          ]}>
             {item.service?.description || 'Aucune description'}
           </Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.statut)}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut?.nom || '') }]}>
+          <Text style={styles.statusText}>{getStatusText(item.statut?.nom || '')}</Text>
         </View>
       </View>
 
@@ -222,34 +271,60 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
             <MaterialIcons name="event" size={16} color="#7f8c8d" />
             <Text style={styles.detailLabel}>Date:</Text>
           </View>
-          <Text style={styles.detailValue}>{formatDate(item.date_rendez_vous)}</Text>
+          <Text style={[
+            styles.detailValue,
+            !item.actif && styles.detailValueInactive
+          ]}>
+            {formatDate(item.date_rendez_vous)}
+          </Text>
         </View>
         <View style={styles.detailRow}>
           <View style={styles.detailLabelContainer}>
             <MaterialIcons name="access-time" size={16} color="#7f8c8d" />
             <Text style={styles.detailLabel}>Heure:</Text>
           </View>
-          <Text style={styles.detailValue}>{formatTime(item.heure_rendez_vous)}</Text>
+          <Text style={[
+            styles.detailValue,
+            !item.actif && styles.detailValueInactive
+          ]}>
+            {formatTime(item.heure_rendez_vous)}
+          </Text>
         </View>
         <View style={styles.detailRow}>
           <View style={styles.detailLabelContainer}>
             <MaterialIcons name="sort" size={16} color="#7f8c8d" />
             <Text style={styles.detailLabel}>Rang:</Text>
           </View>
-          <Text style={styles.detailValue}>#{item.rank}</Text>
+          <View style={[
+            styles.rankBadge,
+            !item.actif && styles.rankBadgeInactive
+          ]}>
+            <Text style={[
+              styles.rankText,
+              !item.actif && styles.rankTextInactive
+            ]}>
+              #{item.rang}
+            </Text>
+          </View>
         </View>
-        {item.commentaire && (
+        {item.motif && (
           <View style={styles.detailRow}>
             <View style={styles.detailLabelContainer}>
               <MaterialIcons name="comment" size={16} color="#7f8c8d" />
-              <Text style={styles.detailLabel}>Commentaire:</Text>
+              <Text style={styles.detailLabel}>Motif:</Text>
             </View>
-            <Text style={styles.detailValue}>{item.commentaire}</Text>
+            <Text style={[
+              styles.detailValue,
+              !item.actif && styles.detailValueInactive
+            ]}>
+              {item.motif}
+            </Text>
           </View>
         )}
       </View>
 
-      {item.statut === 'EN_ATTENTE' || item.statut === 'CONFIRME' ? (
+      {/* Afficher le bouton d'annulation seulement pour les rendez-vous actifs et annulables */}
+      {item.actif && (item.statut?.nom === 'EN_ATTENTE' || item.statut?.nom === 'EN_CONSULTATION') ? (
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => handleCancelRendezVous(item)}
@@ -257,6 +332,11 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
           <MaterialIcons name="cancel" size={18} color="#fff" />
           <Text style={styles.cancelButtonText}>Annuler</Text>
         </TouchableOpacity>
+      ) : !item.actif ? (
+        <View style={styles.cancelledInfo}>
+          <MaterialIcons name="info" size={16} color="#95a5a6" />
+          <Text style={styles.cancelledInfoText}>Ce rendez-vous a été annulé</Text>
+        </View>
       ) : null}
     </View>
   );

@@ -59,9 +59,13 @@ class RealtimeService {
       // Obtenir le token d'authentification
       const token = await this.getAuthToken();
       if (!token) {
-        throw new Error('Token d\'authentification non disponible');
+        console.log('[REALTIME] Pas de token disponible, connexion annulée');
+        this.isConnecting = false;
+        return;
       }
 
+      console.log('[REALTIME] Tentative de connexion avec token...');
+      
       // Créer la connexion WebSocket avec le token
       this.ws = new WebSocket(`${this.config.url}?token=${token}`);
       
@@ -146,14 +150,20 @@ class RealtimeService {
   }
 
   // Gestion de la fermeture de connexion
-  private handleClose(event: CloseEvent): void {
-    console.log('Connexion WebSocket fermée:', event.code, event.reason);
+  private async handleClose(event: CloseEvent): Promise<void> {
+    console.log('[REALTIME] Connexion WebSocket fermée:', event.code, event.reason);
     this.clearTimers();
     this.emit(this.EVENTS.CONNECTION_CLOSE, event);
     
     // Tenter de se reconnecter si ce n'est pas une fermeture volontaire
     if (event.code !== 1000 && this.reconnectAttempts < this.config.maxReconnectAttempts) {
-      this.scheduleReconnect();
+      // Vérifier si l'utilisateur est toujours authentifié avant de tenter la reconnexion
+      const token = await this.getAuthToken();
+      if (token) {
+        this.scheduleReconnect();
+      } else {
+        console.log('[REALTIME] Pas de token disponible, reconnexion annulée');
+      }
     }
   }
 
@@ -164,14 +174,22 @@ class RealtimeService {
   }
 
   // Programmer une tentative de reconnexion
-  private scheduleReconnect(): void {
+  private async scheduleReconnect(): Promise<void> {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
     }
 
-    this.reconnectTimer = setTimeout(() => {
+    this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++;
-      console.log(`Tentative de reconnexion ${this.reconnectAttempts}/${this.config.maxReconnectAttempts}`);
+      console.log(`[REALTIME] Tentative de reconnexion ${this.reconnectAttempts}/${this.config.maxReconnectAttempts}`);
+      
+      // Vérifier si l'utilisateur est toujours authentifié avant de tenter la reconnexion
+      const token = await this.getAuthToken();
+      if (!token) {
+        console.log('[REALTIME] Pas de token disponible, reconnexion annulée');
+        return;
+      }
+      
       this.connect();
     }, this.config.reconnectInterval);
   }

@@ -14,7 +14,12 @@ import { apiService, RealTimeNotification } from '../services/api';
 import { realtimeService } from '../services/realtime';
 import styles from '../styles/screens/NotificationsScreen.styles';
 
-const NotificationsScreen: React.FC = () => {
+interface NotificationsScreenProps {
+  onBack?: () => void;
+  onNavigateToScreen?: (screen: 'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousHistorique' | 'queue' | 'notifications', params?: any) => void;
+}
+
+const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNavigateToScreen }) => {
   const [notifications, setNotifications] = useState<RealTimeNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -102,6 +107,82 @@ const NotificationsScreen: React.FC = () => {
     }
   };
 
+  const handleNotificationPress = async (notification: RealTimeNotification) => {
+    // Marquer comme lu d'abord
+    await markAsRead(notification);
+    
+    // Naviguer vers l'écran approprié selon le type de notification
+    if (onNavigateToScreen) {
+      switch (notification.type) {
+        case 'STATUT_CHANGE':
+          onNavigateToScreen('dashboard');
+          break;
+        case 'QUEUE_UPDATE':
+          onNavigateToScreen('queue');
+          break;
+        case 'RENDEZ_VOUS_REMINDER':
+          onNavigateToScreen('rendezVous');
+          break;
+        case 'GENERAL':
+          // Pour les notifications générales, on reste sur l'écran des notifications
+          break;
+        default:
+          break;
+      }
+    }
+  };
+
+  const formatNotificationData = (data: any, type: string) => {
+    if (!data) return null;
+
+    switch (type) {
+      case 'STATUT_CHANGE':
+        return {
+          title: 'Changement de statut',
+          details: [
+            { label: 'Ancien statut', value: data.oldStatus || 'Non spécifié' },
+            { label: 'Nouveau statut', value: data.newStatus || 'Non spécifié' }
+          ]
+        };
+      
+      case 'QUEUE_UPDATE':
+        return {
+          title: 'Mise à jour de la file d\'attente',
+          details: [
+            { label: 'Position', value: `#${data.position || 'N/A'}` },
+            { label: 'Temps d\'attente estimé', value: `${data.estimatedWait || 0} min` }
+          ]
+        };
+      
+      case 'RENDEZ_VOUS_REMINDER':
+        return {
+          title: 'Rappel de rendez-vous',
+          details: [
+            { label: 'Service', value: data.service || 'Non spécifié' },
+            { label: 'Heure', value: data.appointmentTime || 'Non spécifié' }
+          ]
+        };
+      
+      case 'GENERAL':
+        return {
+          title: 'Information générale',
+          details: Object.entries(data).map(([key, value]) => ({
+            label: key.charAt(0).toUpperCase() + key.slice(1),
+            value: String(value)
+          }))
+        };
+      
+      default:
+        return {
+          title: 'Détails',
+          details: Object.entries(data).map(([key, value]) => ({
+            label: key.charAt(0).toUpperCase() + key.slice(1),
+            value: String(value)
+          }))
+        };
+    }
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'STATUT_CHANGE':
@@ -132,6 +213,21 @@ const NotificationsScreen: React.FC = () => {
     }
   };
 
+  const getNotificationActionText = (type: string) => {
+    switch (type) {
+      case 'STATUT_CHANGE':
+        return 'Voir le statut';
+      case 'QUEUE_UPDATE':
+        return 'Voir la file d\'attente';
+      case 'RENDEZ_VOUS_REMINDER':
+        return 'Voir les rendez-vous';
+      case 'GENERAL':
+        return 'Voir les détails';
+      default:
+        return 'Voir plus';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -153,44 +249,61 @@ const NotificationsScreen: React.FC = () => {
     }
   };
 
-  const renderNotificationItem = ({ item }: { item: RealTimeNotification }) => (
-    <TouchableOpacity
-      style={[
-        styles.notificationCard,
-        !item.read && styles.unreadCard
-      ]}
-      onPress={() => markAsRead(item)}
-    >
-      <View style={styles.notificationHeader}>
-        <View style={styles.notificationIcon}>
-          <MaterialIcons
-            name={getNotificationIcon(item.type)}
-            size={24}
-            color="#333"
+  const renderNotificationItem = ({ item }: { item: RealTimeNotification }) => {
+    const formattedData = formatNotificationData(item.data, item.type);
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.notificationCard,
+          !item.read && styles.unreadCard
+        ]}
+        onPress={() => handleNotificationPress(item)}
+      >
+        <View style={styles.notificationHeader}>
+          <View style={styles.notificationIcon}>
+            <MaterialIcons
+              name={getNotificationIcon(item.type)}
+              size={24}
+              color={getNotificationColor(item.type)}
+            />
+          </View>
+          <View style={styles.notificationInfo}>
+            <Text style={styles.notificationTitle}>{item.title}</Text>
+            <Text style={styles.notificationTime}>
+              {formatDate(item.createdAt)}
+            </Text>
+          </View>
+          {!item.read && (
+            <View style={[styles.unreadDot, { backgroundColor: getNotificationColor(item.type) }]} />
+          )}
+        </View>
+        
+        <Text style={styles.notificationMessage}>{item.message}</Text>
+        
+        {formattedData && (
+          <View style={styles.notificationData}>
+            <Text style={styles.dataTitle}>{formattedData.title}</Text>
+            {formattedData.details.map((detail, index) => (
+              <View key={index} style={styles.dataRow}>
+                <Text style={styles.dataLabel}>{detail.label}:</Text>
+                <Text style={styles.dataValue}>{detail.value}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        
+        <View style={styles.notificationAction}>
+          <Text style={styles.actionText}>{getNotificationActionText(item.type)}</Text>
+          <MaterialIcons 
+            name="arrow-forward-ios" 
+            size={16} 
+            color={getNotificationColor(item.type)} 
           />
         </View>
-        <View style={styles.notificationInfo}>
-          <Text style={styles.notificationTitle}>{item.title}</Text>
-          <Text style={styles.notificationTime}>
-            {formatDate(item.createdAt)}
-          </Text>
-        </View>
-        {!item.read && (
-          <View style={[styles.unreadDot, { backgroundColor: getNotificationColor(item.type) }]} />
-        )}
-      </View>
-      
-      <Text style={styles.notificationMessage}>{item.message}</Text>
-      
-      {item.data && (
-        <View style={styles.notificationData}>
-          <Text style={styles.dataText}>
-            {JSON.stringify(item.data, null, 2)}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -209,27 +322,26 @@ const NotificationsScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={24} color="#3498db" />
-          </TouchableOpacity>
-          {unreadCount > 0 && (
-            <TouchableOpacity
-              style={styles.markAllButton}
-              onPress={markAllAsRead}
-            >
-              <MaterialIcons name="done-all" size={16} color="#fff" />
-              <Text style={styles.markAllText}>Tout marquer</Text>
+          {onBack && (
+            <TouchableOpacity style={styles.backButton} onPress={onBack}>
+              <MaterialIcons name="arrow-back" size={24} color="#3498db" />
             </TouchableOpacity>
           )}
         </View>
         <Text style={styles.headerTitle}>Notifications</Text>
         <Text style={styles.headerSubtitle}>
-          {unreadCount > 0 
-            ? `${unreadCount} notification${unreadCount > 1 ? 's' : ''} non lue${unreadCount > 1 ? 's' : ''}`
-            : 'Toutes vos notifications'
-          }
+          {unreadCount > 0 ? `${unreadCount} nouvelle(s) notification(s)` : 'Aucune nouvelle notification'}
         </Text>
       </View>
+
+      {unreadCount > 0 && (
+        <View style={styles.markAllContainer}>
+          <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
+            <MaterialIcons name="done-all" size={16} color="#3498db" />
+            <Text style={styles.markAllText}>Tout marquer comme lu</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FlatList
         data={notifications}
@@ -242,27 +354,16 @@ const NotificationsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="notifications" size={48} color="#95a5a6" />
+            <MaterialIcons name="notifications-none" size={64} color="#bdc3c7" />
             <Text style={styles.emptyTitle}>Aucune notification</Text>
             <Text style={styles.emptyText}>
-              Vous n'avez pas encore reçu de notifications.
+              Vous n'avez pas encore reçu de notifications
             </Text>
           </View>
-        }
-        ListHeaderComponent={
-          unreadCount > 0 ? (
-            <View style={styles.unreadHeader}>
-              <Text style={styles.unreadText}>
-                {unreadCount} notification{unreadCount > 1 ? 's' : ''} non lue{unreadCount > 1 ? 's' : ''}
-              </Text>
-            </View>
-          ) : null
         }
       />
     </SafeAreaView>
   );
 };
-
-
 
 export default NotificationsScreen; 

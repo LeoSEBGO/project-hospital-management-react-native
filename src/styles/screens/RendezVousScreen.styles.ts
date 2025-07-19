@@ -153,6 +153,72 @@ export default StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  rankBadge: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#3498db',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  rankText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  // Styles pour les rendez-vous annulés/inactifs
+  rendezVousCardInactive: {
+    opacity: 0.7,
+    backgroundColor: '#f8f9fa',
+  },
+  serviceNameInactive: {
+    color: '#95a5a6',
+  },
+  serviceDescriptionInactive: {
+    color: '#bdc3c7',
+  },
+  detailValueInactive: {
+    color: '#95a5a6',
+  },
+  rankBadgeInactive: {
+    backgroundColor: '#95a5a6',
+  },
+  rankTextInactive: {
+    color: '#fff',
+  },
+  cancelledBadge: {
+    backgroundColor: '#e74c3c',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  cancelledBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  cancelledInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  cancelledInfoText: {
+    fontSize: 12,
+    color: '#95a5a6',
+    marginLeft: 5,
+    fontStyle: 'italic',
+  },
   commentContainer: {
     marginTop: 10,
     padding: 10,

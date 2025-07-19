@@ -11,6 +11,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { RendezVous } from '../services/api';
 import styles from '../styles/screens/RendezVousDetailScreen.styles';
 import { realtimeService } from '../services/realtime';
+import apiService from '../services/api';
 
 interface RendezVousDetailScreenProps {
   rendezVous: RendezVous;
@@ -72,11 +73,50 @@ const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({
         { 
           text: 'Oui, annuler', 
           style: 'destructive',
-          onPress: () => {
-            // TODO: Appeler l'API pour annuler le rendez-vous
-            console.log('Annuler le rendez-vous:', rendezVousId);
-            Alert.alert('Succès', 'Rendez-vous annulé avec succès');
-            onBack();
+          onPress: async () => {
+            try {
+              console.log(`[RENDEZ_VOUS_DETAIL] Tentative d'annulation du rendez-vous ${rendezVous.id}`);
+              
+              const response = await apiService.cancelRendezVous(rendezVous.id, 'Annulé par le patient');
+              
+              if (response.success) {
+                Alert.alert(
+                  'Succès', 
+                  'Rendez-vous annulé avec succès',
+                  [
+                    {
+                      text: 'OK',
+                      onPress: () => {
+                        console.log('[RENDEZ_VOUS_DETAIL] Retour à la liste après annulation');
+                        onBack();
+                      }
+                    }
+                  ]
+                );
+              } else {
+                Alert.alert('Erreur', response.message || 'Impossible d\'annuler le rendez-vous');
+              }
+            } catch (error: any) {
+              console.error('[RENDEZ_VOUS_DETAIL] Erreur lors de l\'annulation:', error);
+              
+              let errorMessage = 'Erreur lors de l\'annulation du rendez-vous';
+              
+              if (error.message) {
+                if (error.message.includes('déjà été annulé')) {
+                  errorMessage = 'Ce rendez-vous a déjà été annulé';
+                } else if (error.message.includes('pas autorisé')) {
+                  errorMessage = 'Vous n\'êtes pas autorisé à annuler ce rendez-vous';
+                } else if (error.message.includes('ne peut pas être annulé')) {
+                  errorMessage = error.message;
+                } else if (error.message.includes('connexion réseau')) {
+                  errorMessage = 'Erreur de connexion. Vérifiez votre connexion internet.';
+                } else {
+                  errorMessage = error.message;
+                }
+              }
+              
+              Alert.alert('Erreur', errorMessage);
+            }
           }
         },
       ]
@@ -180,14 +220,14 @@ const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({
               <MaterialIcons name="event" size={20} color="#3498db" />
               <Text style={styles.infoLabel}>Date:</Text>
               <Text style={styles.infoValue}>
-                {rendezVous.date_rdv ? formatDate(rendezVous.date_rdv) : 'Date à définir'}
+                {rendezVous.date_rendez_vous ? formatDate(rendezVous.date_rendez_vous) : 'Date à définir'}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <MaterialIcons name="schedule" size={20} color="#3498db" />
               <Text style={styles.infoLabel}>Heure:</Text>
               <Text style={styles.infoValue}>
-                {rendezVous.date_rdv ? 'À définir' : 'Non spécifiée'}
+                {rendezVous.heure_rendez_vous ? rendezVous.heure_rendez_vous : 'Non spécifiée'}
               </Text>
             </View>
           </View>
@@ -200,7 +240,9 @@ const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({
             <View style={styles.infoRow}>
               <MaterialIcons name="queue" size={20} color="#3498db" />
               <Text style={styles.infoLabel}>Rang:</Text>
-              <Text style={styles.infoValue}>#{rendezVous.rang}</Text>
+              <View style={styles.rankBadge}>
+                <Text style={styles.rankText}>#{rendezVous.rang}</Text>
+              </View>
             </View>
           </View>
         </View>

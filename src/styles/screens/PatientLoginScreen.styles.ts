@@ -94,6 +94,25 @@ export const patientLoginStyles = StyleSheet.create({
     lineHeight: typography.lineHeight.normal,
     textAlign: 'center',
   },
+  errorText: {
+    fontSize: typography.fontSize.sm,
+    color: '#e74c3c',
+    marginTop: spacing.xs,
+    marginLeft: spacing.sm,
+  },
+  errorContainer: {
+    backgroundColor: '#fdf2f2',
+    borderColor: '#e74c3c',
+    borderWidth: 1,
+    borderRadius: layout.borderRadius.md,
+    padding: spacing.base,
+    marginBottom: spacing.lg,
+  },
+  errorMessage: {
+    fontSize: typography.fontSize.sm,
+    color: '#e74c3c',
+    textAlign: 'center',
+  },
 });
 
 export default patientLoginStyles; 

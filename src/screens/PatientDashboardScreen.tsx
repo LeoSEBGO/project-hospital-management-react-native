@@ -11,12 +11,13 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../contexts/AuthContext';
-import { apiService, Patient, Statut, StatutHistorique, RendezVous } from '../services/api';
+import { apiService, Patient, Statut, StatutHistorique, RendezVous, RealTimeNotification } from '../services/api';
 import realtimeService from '../services/realtime';
 import ServicesScreen from './ServicesScreen';
 import BookAppointmentScreen from './BookAppointmentScreen';
 import RendezVousScreen from './RendezVousScreen';
 import RendezVousDetailScreen from './RendezVousDetailScreen';
+import RendezVousHistoriqueScreen from './RendezVousHistoriqueScreen';
 import QueueScreen from './QueueScreen';
 import NotificationsScreen from './NotificationsScreen';
 import styles from '../styles/screens/PatientDashboardScreen.styles';
@@ -29,15 +30,14 @@ const PatientDashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'queue' | 'notifications'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousHistorique' | 'queue' | 'notifications'>('dashboard');
   const [patientData, setPatientData] = useState<Patient | null>(patient);
   const [rendezVous, setRendezVous] = useState<RendezVous[]>([]);
   const [selectedRendezVous, setSelectedRendezVous] = useState<RendezVous | null>(null);
+  const [notifications, setNotifications] = useState<RealTimeNotification[]>([]);
 
   useEffect(() => {
     loadPatientData();
-    setupRealtimeConnection();
-    setupAutoRefresh();
     
     // Si les données du patient ne contiennent pas le service, les recharger
     if (patient && !patient.service) {
@@ -54,8 +54,31 @@ const PatientDashboardScreen: React.FC = () => {
     };
   }, []);
 
+  // Effet pour gérer la connexion realtime uniquement quand l'utilisateur est authentifié
+  useEffect(() => {
+    if (patient) {
+      // L'utilisateur est authentifié, se connecter au realtime
+      console.log('[DASHBOARD] Utilisateur authentifié, connexion au realtime...');
+      setupRealtimeConnection();
+      setupAutoRefresh();
+    } else {
+      // L'utilisateur n'est pas authentifié, déconnecter le realtime
+      console.log('[DASHBOARD] Utilisateur non authentifié, déconnexion du realtime...');
+      realtimeService.disconnect();
+      setIsConnected(false);
+    }
+  }, [patient]);
+
   const setupRealtimeConnection = async () => {
     try {
+      // Vérifier que l'utilisateur est authentifié
+      if (!patient) {
+        console.log('[DASHBOARD] Utilisateur non authentifié, connexion realtime annulée');
+        return;
+      }
+
+      console.log('[DASHBOARD] Configuration de la connexion realtime...');
+      
       // Écouter les changements de statut et notifications
       realtimeService.on('statut_change', handleStatutChange);
       realtimeService.on('notification', handleNewNotification);
@@ -71,9 +94,10 @@ const PatientDashboardScreen: React.FC = () => {
   };
 
   const setupAutoRefresh = () => {
-    // Refresh automatique toutes les 30 secondes
+    // Refresh automatique toutes les 30 secondes seulement si connecté
     const interval = setInterval(() => {
-      if (currentScreen === 'dashboard' && isConnected) {
+      if (currentScreen === 'dashboard' && isConnected && patient) {
+        console.log('[DASHBOARD] Refresh automatique...');
         loadPatientData();
         setLastUpdate(new Date());
       }
@@ -169,38 +193,37 @@ const PatientDashboardScreen: React.FC = () => {
       setLoading(true);
       console.log('[DASHBOARD] Chargement des données patient...');
       
-      const [patientResponse, statutResponse, historiqueResponse, rendezVousResponse] = await Promise.all([
+      const [patientResponse, statutResponse, historiqueResponse, rendezVousResponse, notificationsResponse] = await Promise.all([
         apiService.getCurrentPatient(),
         apiService.getPatientStatut(),
         apiService.getPatientStatutHistorique(),
-        apiService.getRendezVous(),
+        apiService.getRendezVousActifs(), // Utiliser la nouvelle méthode pour les rendez-vous actifs
+        apiService.getNotifications(),
       ]);
 
-      console.log('[DASHBOARD] Réponse patient:', patientResponse);
-      console.log('[DASHBOARD] Réponse statut:', statutResponse);
-      console.log('[DASHBOARD] Réponse historique:', historiqueResponse);
-
       if (patientResponse.success && patientResponse.data) {
-        console.log('[DASHBOARD] Patient chargé:', patientResponse.data);
         setPatientData(patientResponse.data);
       }
 
       if (statutResponse.success && statutResponse.data) {
-        console.log('[DASHBOARD] Statut chargé:', statutResponse.data);
         setCurrentStatut(statutResponse.data);
       }
 
       if (historiqueResponse.success && historiqueResponse.data) {
-        console.log('[DASHBOARD] Historique chargé:', historiqueResponse.data);
         setStatutHistorique(historiqueResponse.data);
       }
 
       if (rendezVousResponse.success && rendezVousResponse.data) {
-        console.log('[DASHBOARD] Rendez-vous chargés:', rendezVousResponse.data);
         setRendezVous(rendezVousResponse.data);
+        console.log(`[DASHBOARD] Rendez-vous actifs chargés: ${rendezVousResponse.data.length}`);
       }
+
+      if (notificationsResponse.success && notificationsResponse.data) {
+        setNotifications(notificationsResponse.data);
+      }
+
     } catch (error) {
-      console.error('[DASHBOARD] Erreur lors du chargement des données:', error);
+      console.error('Erreur lors du chargement des données:', error);
     } finally {
       setLoading(false);
     }
@@ -342,11 +365,15 @@ const PatientDashboardScreen: React.FC = () => {
   }
 
   if (currentScreen === 'notifications') {
-    return <NotificationsScreen />;
+    return <NotificationsScreen onBack={goBackToDashboard} onNavigateToScreen={navigateToScreen} />;
   }
 
   if (currentScreen === 'rendezVousDetail' && selectedRendezVous) {
     return <RendezVousDetailScreen rendezVous={selectedRendezVous} onBack={goBackToDashboard} />;
+  }
+
+  if (currentScreen === 'rendezVousHistorique') {
+    return <RendezVousHistoriqueScreen onBack={goBackToDashboard} />;
   }
 
   // Écran principal du dashboard
@@ -372,6 +399,23 @@ const PatientDashboardScreen: React.FC = () => {
             </Text>
           </View>
           <View style={styles.headerActions}>
+            <TouchableOpacity 
+              style={styles.notificationButton}
+              onPress={() => navigateToScreen('notifications')}
+            >
+              <MaterialIcons 
+                name="notifications" 
+                size={20} 
+                color="#3498db" 
+              />
+              {notifications.filter(n => !n.read).length > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notifications.filter(n => !n.read).length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
             <TouchableOpacity 
               style={styles.refreshButton}
               onPress={loadPatientData}
@@ -429,7 +473,7 @@ const PatientDashboardScreen: React.FC = () => {
                     <View style={styles.rendezVousInfo}>
                       <Text style={styles.rendezVousService}>{rdv.service?.nom || 'Service inconnu'}</Text>
                       <Text style={styles.rendezVousDate}>
-                        {rdv.date_rdv ? formatDate(rdv.date_rdv) : 'Date à définir'}
+                        {rdv.date_rendez_vous ? formatDate(rdv.date_rendez_vous) : 'Date à définir'}
                       </Text>
                     </View>
                     <View style={[styles.rendezVousStatus, { backgroundColor: getStatusColor(rdv.statut?.nom || '') }]}> 
@@ -494,7 +538,7 @@ const PatientDashboardScreen: React.FC = () => {
                     <View style={styles.rendezVousInfo}>
                       <Text style={styles.rendezVousService}>{rdv.service?.nom || 'Service inconnu'}</Text>
                       <Text style={styles.rendezVousDate}>
-                        {rdv.date_rdv ? formatDate(rdv.date_rdv) : 'Date à définir'}
+                        {rdv.date_rendez_vous ? formatDate(rdv.date_rendez_vous) : 'Date à définir'}
                       </Text>
                     </View>
                     <View style={[styles.rendezVousStatus, { backgroundColor: getStatusColor(rdv.statut?.nom || '') }]}>
@@ -549,11 +593,11 @@ const PatientDashboardScreen: React.FC = () => {
             
             <TouchableOpacity 
               style={styles.actionCard}
-              onPress={() => navigateToScreen('notifications')}
+              onPress={() => navigateToScreen('rendezVousHistorique')}
             >
-              <MaterialIcons name="notifications" size={32} color="#e74c3c" />
-              <Text style={styles.actionTitle}>Notifications</Text>
-              <Text style={styles.actionDescription}>Temps réel</Text>
+              <MaterialIcons name="history" size={32} color="#9b59b6" />
+              <Text style={styles.actionTitle}>Historique</Text>
+              <Text style={styles.actionDescription}>Rendez-vous</Text>
             </TouchableOpacity>
           </View>
         </View>

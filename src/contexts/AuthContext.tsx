@@ -9,6 +9,7 @@ interface AuthContextType {
   patientLogin: (credentials: PatientLoginRequest) => Promise<void>;
   patientLogout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
+  validateToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,48 +28,103 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     checkAuthStatus();
   }, []);
 
+  // Validation périodique du token (toutes les 24 heures)
+  useEffect(() => {
+    if (isAuthenticated) {
+      const interval = setInterval(() => {
+        validateToken();
+      }, 24 * 60 * 60 * 1000); // 24 heures
+
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
   const checkAuthStatus = async () => {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('patientToken');
-      const patientData = await AsyncStorage.getItem('patient');
 
-      if (token && patientData) {
-        const parsedPatient = JSON.parse(patientData);
-        setPatient(parsedPatient);
-        setIsAuthenticated(true);
+      if (token) {
+        // Vérifier le token en récupérant le profil utilisateur
+        const response = await apiService.getCurrentPatient();
+        
+        if (response.success && response.data) {
+          // Token valide, mettre à jour les données
+          setPatient(response.data);
+          await AsyncStorage.setItem('patient', JSON.stringify(response.data));
+          setIsAuthenticated(true);
+          console.log('[AUTH] Utilisateur authentifié, statut mis à jour');
+        } else {
+          // Token invalide
+          console.log('[AUTH] Token invalide, déconnexion...');
+          await handleInvalidToken();
+        }
       } else {
+        console.log('[AUTH] Aucun token trouvé, utilisateur non authentifié');
         setIsAuthenticated(false);
         setPatient(null);
       }
-    } catch (error) {
-      console.error('Erreur lors de la vérification du statut d\'auth:', error);
-      setIsAuthenticated(false);
-      setPatient(null);
+    } catch (error: any) {
+      console.error('[AUTH] Erreur lors de la vérification du statut d\'auth:', error);
+      
+      // Si c'est une erreur d'authentification, déconnecter
+      if (error?.message?.includes('Token invalide') || 
+          error?.message?.includes('401') || 
+          error?.message?.includes('Unauthorized')) {
+        console.log('[AUTH] Erreur d\'authentification, déconnexion...');
+        await handleInvalidToken();
+      } else {
+        // Pour les autres erreurs, on ne déconnecte pas automatiquement
+        console.log('[AUTH] Erreur non-authentification, statut non authentifié');
+        setIsAuthenticated(false);
+        setPatient(null);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleInvalidToken = async () => {
+    console.log('[AUTH] Token invalide détecté, déconnexion...');
+    try {
+      await AsyncStorage.removeItem('patientToken');
+      await AsyncStorage.removeItem('patient');
+      console.log('[AUTH] Données de stockage nettoyées');
+    } catch (error) {
+      console.error('[AUTH] Erreur lors du nettoyage du stockage:', error);
+    }
+    setIsAuthenticated(false);
+    setPatient(null);
+    console.log('[AUTH] État d\'authentification mis à jour');
+  };
+
   const patientLogin = async (credentials: PatientLoginRequest) => {
     try {
       setLoading(true);
+      console.log('[AUTH] Début de connexion avec:', credentials.email);
+      
       // On force le typage pour matcher la réponse réelle de l'API
       const response: any = await apiService.patientLogin(credentials);
 
       if (response.token && response.patient) {
         const { token, patient } = response;
+        console.log('[AUTH] Connexion réussie pour:', patient.email);
 
+        // Stocker les données d'authentification
         await AsyncStorage.setItem('patientToken', token);
         await AsyncStorage.setItem('patient', JSON.stringify(patient));
 
+        // Mettre à jour l'état
         setPatient(patient);
         setIsAuthenticated(true);
+        
+        console.log('[AUTH] État d\'authentification mis à jour');
       } else {
+        console.log('[AUTH] Réponse invalide:', response);
         throw new Error(response.message || 'Erreur de connexion');
       }
     } catch (error) {
-      console.error('Erreur de connexion:', error);
+      console.error('[AUTH] Erreur de connexion:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -78,13 +134,66 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const patientLogout = async () => {
     try {
       setLoading(true);
+      console.log('[AUTH] Début de la déconnexion...');
+      
+      // Appeler l'API de déconnexion
       await apiService.patientLogout();
-      setIsAuthenticated(false);
-      setPatient(null);
+      
+      // Nettoyer les données locales
+      await handleInvalidToken();
+      
+      console.log('[AUTH] Déconnexion réussie');
     } catch (error) {
-      console.error('Erreur de déconnexion:', error);
+      console.error('[AUTH] Erreur de déconnexion:', error);
+      // Même en cas d'erreur, nettoyer les données locales
+      await handleInvalidToken();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const validateToken = async (): Promise<boolean> => {
+    try {
+      console.log('[AUTH] Début de validation du token...');
+      const token = await AsyncStorage.getItem('patientToken');
+      
+      if (!token) {
+        console.log('[AUTH] Aucun token trouvé');
+        return false;
+      }
+
+      console.log('[AUTH] Token trouvé, validation via API...');
+      
+      // Vérifier le token en récupérant le profil utilisateur
+      const response = await apiService.getCurrentPatient();
+      
+      if (response.success && response.data) {
+        // Token valide, mettre à jour les données
+        console.log('[AUTH] Token valide, mise à jour des données');
+        setPatient(response.data);
+        await AsyncStorage.setItem('patient', JSON.stringify(response.data));
+        return true;
+      } else {
+        // Token invalide
+        console.log('[AUTH] Token invalide selon la réponse API');
+        await handleInvalidToken();
+        return false;
+      }
+    } catch (error: any) {
+      console.error('[AUTH] Erreur lors de la validation du token:', error);
+      
+      // Si c'est une erreur d'authentification, déconnecter
+      if (error?.message?.includes('Token invalide') || 
+          error?.message?.includes('401') || 
+          error?.message?.includes('Unauthorized')) {
+        console.log('[AUTH] Erreur d\'authentification détectée');
+        await handleInvalidToken();
+        return false;
+      }
+      
+      // Pour les autres erreurs, on ne déconnecte pas automatiquement
+      console.log('[AUTH] Erreur non-authentification, validation échouée');
+      return false;
     }
   };
 
@@ -95,6 +204,7 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     patientLogin,
     patientLogout,
     checkAuthStatus,
+    validateToken,
   };
 
   return (

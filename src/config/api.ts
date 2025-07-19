@@ -1,9 +1,11 @@
+import { Platform } from 'react-native';
+
 // Configuration de l'API
 export const API_CONFIG = {
   // URL de base de l'API - à adapter selon votre environnement
   BASE_URL: __DEV__ 
-    ? 'http://192.168.11.110:3000/api'
-    : 'http://127.0.0.1:3000/api',
+    ? 'http://10.76.43.231:3000/api'  // Pour développement local
+    : 'http://localhost:3000/api',
 
   // Timeout des requêtes (en millisecondes)
   TIMEOUT: 10000,
@@ -69,6 +71,8 @@ export const API_CONFIG = {
       DELETE: (id: string|number) => `/rendez-vous/${id}`,
       BY_SERVICE: (serviceId: string|number) => `/rendez-vous/service/${serviceId}`,
       BY_PATIENT: (patientId: string|number) => `/rendez-vous/patient/${patientId}`,
+      HISTORIQUE: '/rendez-vous/historique',
+      HISTORIQUE_PATIENT: (patientId: string|number) => `/rendez-vous/historique/${patientId}`,
     },
     // Staff
     STAFF: {
@@ -78,6 +82,21 @@ export const API_CONFIG = {
       UPDATE: (id: string|number) => `/staff/${id}`,
       DELETE: (id: string|number) => `/staff/${id}`,
       BY_SERVICE: (serviceId: string|number) => `/staff/service/${serviceId}`,
+    },
+    // Notifications
+    NOTIFICATIONS: {
+      LIST: '/notifications/me',
+      MARK_READ: (id: string|number) => `/notifications/me/${id}/read`,
+      MARK_ALL_READ: '/notifications/me/read-all',
+      DELETE: (id: string|number) => `/notifications/me/${id}`,
+      DELETE_ALL: '/notifications/me',
+    },
+    // Queue
+    QUEUE: {
+      POSITION: '/queue/position',
+      STATS: '/queue/stats',
+      JOIN: '/queue/join',
+      LEAVE: '/queue/leave',
     },
     // Divers
     HEALTH: '/health', // à appeler sans /api devant
@@ -128,16 +147,25 @@ export const isDevelopment = (): boolean => {
 
 // Fonction pour obtenir la configuration selon l'environnement
 export const getEnvironmentConfig = () => {
+  let apiUrl = API_CONFIG.BASE_URL;
+  
   if (isDevelopment()) {
-    return {
-      apiUrl: API_CONFIG.BASE_URL,
-      timeout: API_CONFIG.TIMEOUT,
-      enableLogging: true,
-    };
+    // En développement, essayer de détecter l'IP automatiquement
+    // Pour les émulateurs Android, utiliser 10.0.2.2
+    // Pour les émulateurs iOS, utiliser localhost
+    // Pour les appareils physiques, utiliser l'IP de la machine
+    if (Platform.OS === 'android') {
+      apiUrl = 'http://10.0.2.2:3000/api';
+    } else if (Platform.OS === 'ios') {
+      apiUrl = 'http://localhost:3000/api';
+    } else {
+      apiUrl = 'http://localhost:3000/api';
+    }
   }
+  
   return {
-    apiUrl: API_CONFIG.BASE_URL,
+    apiUrl,
     timeout: API_CONFIG.TIMEOUT,
-    enableLogging: false,
+    enableLogging: isDevelopment(),
   };
 }; 

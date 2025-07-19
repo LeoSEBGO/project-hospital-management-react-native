@@ -124,6 +124,33 @@ export default StyleSheet.create({
     fontSize: 16,
     color: '#2c3e50',
   },
+  dateTimeButton: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateTimeButtonText: {
+    fontSize: 16,
+    color: '#2c3e50',
+    flex: 1,
+    marginLeft: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 10,
+  },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
@@ -147,6 +174,103 @@ export default StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  // Styles pour le modal de sélection de service
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    minHeight: '50%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8e8e8',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+  },
+  modalCloseButton: {
+    padding: 5,
+  },
+  serviceList: {
+    flex: 1,
+  },
+  serviceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  serviceItemContent: {
+    flex: 1,
+  },
+  serviceItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  serviceItemDescription: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    lineHeight: 18,
+  },
+  // Styles pour la sélection d'heure
+  timeList: {
+    flex: 1,
+    padding: 20,
+  },
+  timeSection: {
+    marginBottom: 20,
+  },
+  timeSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 10,
+  },
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  timeItemContainer: {
+    width: '30%',
+    marginBottom: 10,
+  },
+  timeItem: {
+    backgroundColor: '#3498db',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  timeItemDisabled: {
+    backgroundColor: '#ecf0f1',
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+  },
+  timeItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  timeItemTextDisabled: {
+    color: '#95a5a6',
   },
   infoContainer: {
     backgroundColor: '#e8f4fd',

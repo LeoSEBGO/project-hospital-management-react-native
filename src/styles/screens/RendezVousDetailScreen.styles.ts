@@ -116,6 +116,25 @@ export default StyleSheet.create({
     flex: 2,
     textAlign: 'right',
   },
+  rankBadge: {
+    backgroundColor: '#3498db',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#3498db',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  rankText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   commentText: {
     fontSize: 14,
     color: '#2c3e50',
