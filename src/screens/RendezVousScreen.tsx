@@ -13,17 +13,21 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { apiService, RendezVous } from '../services/api';
 import { realtimeService } from '../services/realtime';
 import styles from '../styles/screens/RendezVousScreen.styles';
+import BookAppointmentScreen from './BookAppointmentScreen';
+
 
 interface RendezVousScreenProps {
   onBack?: () => void;
+  onNavigateToScreen?: (screen: 'bookAppointment' | 'rendezVous') => void;
 }
 
-const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
+const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack, onNavigateToScreen }) => {
   const [rendezVous, setRendezVous] = useState<RendezVous[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [currentScreen, setCurrentScreen] = useState<'rendezVous' | 'bookAppointment'>('rendezVous');
 
   useEffect(() => {
     loadRendezVous();
@@ -37,6 +41,10 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
       realtimeService.off('connection_close', handleConnectionClose);
     };
   }, []);
+
+  if (currentScreen === 'bookAppointment') {
+    return <BookAppointmentScreen onBack={() => setCurrentScreen('rendezVous')} />;
+  }
 
   const setupRealtimeConnection = async () => {
     try {
@@ -79,8 +87,6 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
 
   const handleNewNotification = (notification: any) => {
     console.log('Nouvelle notification reçue:', notification);
-    // Vous pouvez ajouter la logique de gestion des notifications ici
-    // Par exemple, si la notification est un nouveau rendez-vous, vous pouvez la charger
     if (notification.type === 'rendez_vous_created' || notification.type === 'rendez_vous_updated') {
       loadRendezVous();
     }
@@ -367,22 +373,11 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack }) => {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <View style={styles.connectionStatus}>
-            <MaterialIcons 
-              name={isConnected ? 'wifi' : 'wifi-off'} 
-              size={16}
-              color={isConnected ? '#27ae60' : '#95a5a6'} 
-            />
-            <Text style={styles.connectionStatusText}>
-              {isConnected ? 'Temps réel' : 'Inactif'}
-            </Text>
-          </View>
           <TouchableOpacity
             style={styles.newButton}
-            onPress={() => onBack && onBack()}
+            onPress={() => setCurrentScreen('bookAppointment')}
           >
             <MaterialIcons name="add" size={20} color="#fff" />
-            <Text style={styles.newButtonText}>Nouveau</Text>
           </TouchableOpacity>
         </View>
       </View>

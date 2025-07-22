@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiService, PatientLoginRequest, PatientLoginResponse } from '../services/api';
+import { apiService, PatientLoginRequest, PatientLoginResponse, Patient, ApiResponse } from '../services/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  patient: PatientLoginResponse['patient'] | null;
+  patient: Patient | null;
   loading: boolean;
   patientLogin: (credentials: PatientLoginRequest) => Promise<void>;
   patientLogout: () => Promise<void>;
@@ -18,9 +18,9 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [patient, setPatient] = useState<PatientLoginResponse['patient'] | null>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Vérifier le statut d'authentification au démarrage
@@ -44,25 +44,26 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       const token = await AsyncStorage.getItem('patientToken');
 
-      if (token) {
-        // Vérifier le token en récupérant le profil utilisateur
-        const response = await apiService.getCurrentPatient();
-        
-        if (response.success && response.data) {
-          // Token valide, mettre à jour les données
-          setPatient(response.data);
-          await AsyncStorage.setItem('patient', JSON.stringify(response.data));
-          setIsAuthenticated(true);
-          console.log('[AUTH] Utilisateur authentifié, statut mis à jour');
-        } else {
-          // Token invalide
-          console.log('[AUTH] Token invalide, déconnexion...');
-          await handleInvalidToken();
-        }
-      } else {
+      if (!token) {
         console.log('[AUTH] Aucun token trouvé, utilisateur non authentifié');
         setIsAuthenticated(false);
         setPatient(null);
+        return;
+      }
+
+      // Vérifier le token en récupérant le profil utilisateur
+      const response = await apiService.getCurrentPatient();
+      
+      if (response.success && response.data) {
+        // Token valide, mettre à jour les données
+        setPatient(response.data);
+        await AsyncStorage.setItem('patient', JSON.stringify(response.data));
+        setIsAuthenticated(true);
+        console.log('[AUTH] Utilisateur authentifié, statut mis à jour');
+      } else {
+        // Token invalide
+        console.log('[AUTH] Token invalide, déconnexion...');
+        await handleInvalidToken();
       }
     } catch (error: any) {
       console.error('[AUTH] Erreur lors de la vérification du statut d\'auth:', error);
@@ -70,7 +71,8 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Si c'est une erreur d'authentification, déconnecter
       if (error?.message?.includes('Token invalide') || 
           error?.message?.includes('401') || 
-          error?.message?.includes('Unauthorized')) {
+          error?.message?.includes('Unauthorized') ||
+          error?.response?.status === 401) {
         console.log('[AUTH] Erreur d\'authentification, déconnexion...');
         await handleInvalidToken();
       } else {
@@ -103,11 +105,10 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       console.log('[AUTH] Début de connexion avec:', credentials.email);
       
-      // On force le typage pour matcher la réponse réelle de l'API
-      const response: any = await apiService.patientLogin(credentials);
+      const response: ApiResponse<PatientLoginResponse> = await apiService.patientLogin(credentials);
 
-      if (response.token && response.patient) {
-        const { token, patient } = response;
+      if (response.success && response.data) {
+        const { token, patient } = response.data;
         console.log('[AUTH] Connexion réussie pour:', patient.email);
 
         // Stocker les données d'authentification
@@ -123,7 +124,7 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('[AUTH] Réponse invalide:', response);
         throw new Error(response.message || 'Erreur de connexion');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[AUTH] Erreur de connexion:', error);
       throw error;
     } finally {
@@ -185,7 +186,8 @@ export const  AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Si c'est une erreur d'authentification, déconnecter
       if (error?.message?.includes('Token invalide') || 
           error?.message?.includes('401') || 
-          error?.message?.includes('Unauthorized')) {
+          error?.message?.includes('Unauthorized') ||
+          error?.response?.status === 401) {
         console.log('[AUTH] Erreur d\'authentification détectée');
         await handleInvalidToken();
         return false;

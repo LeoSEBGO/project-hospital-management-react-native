@@ -6,111 +6,47 @@ import {
   RefreshControl,
   ScrollView,
   ActivityIndicator,
-  Alert,
-  Animated,
+  TouchableOpacity,
+  FlatList,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { apiService, QueuePosition, QueueStats } from '../services/api';
-import { realtimeService } from '../services/realtime';
+import { apiService, RendezVous } from '../services/api';
 import styles from '../styles/screens/QueueScreen.styles';
+import QueueFollowScreen from './QueueFollowScreen';
 
-const QueueScreen: React.FC = () => {
-  const [queuePosition, setQueuePosition] = useState<QueuePosition | null>(null);
-  const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
+interface QueueScreenProps {
+  onBack?: () => void;
+}
+
+const QueueScreen: React.FC<QueueScreenProps> = ({ onBack }) => {
+  const [rendezVousDuJour, setRendezVousDuJour] = useState<RendezVous[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  
-  // Animation pour le pulse
-  const pulseAnim = new Animated.Value(1);
+  const [selectedRdv, setSelectedRdv] = useState<RendezVous | null>(null);
 
   useEffect(() => {
-    loadQueueData();
-    setupRealtimeConnection();
-    
-    return () => {
-      // Nettoyer les listeners lors du démontage
-      realtimeService.off('queue_update', handleQueueUpdate);
-      realtimeService.off('connection_open', handleConnectionOpen);
-      realtimeService.off('connection_close', handleConnectionClose);
-    };
+    loadRendezVousDuJour();
   }, []);
 
-  useEffect(() => {
-    if (isConnected) {
-      startPulseAnimation();
-    }
-  }, [isConnected]);
-
-  const setupRealtimeConnection = async () => {
-    try {
-      // Écouter les mises à jour de la queue
-      realtimeService.on('queue_update', handleQueueUpdate);
-      realtimeService.on('connection_open', handleConnectionOpen);
-      realtimeService.on('connection_close', handleConnectionClose);
-      
-      // Se connecter au WebSocket
-      await realtimeService.connect();
-    } catch (error) {
-      console.error('Erreur de connexion temps réel:', error);
-    }
-  };
-
-  const handleQueueUpdate = (update: any) => {
-    if (update.queuePosition) {
-      setQueuePosition(update.queuePosition);
-    }
-  };
-
-  const handleConnectionOpen = () => {
-    setIsConnected(true);
-  };
-
-  const handleConnectionClose = () => {
-    setIsConnected(false);
-  };
-
-  const startPulseAnimation = () => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  };
-
-  const loadQueueData = async () => {
+  const loadRendezVousDuJour = async () => {
     try {
       setLoading(true);
-      const [positionResponse, statsResponse] = await Promise.all([
-        apiService.getQueuePosition(),
-        apiService.getQueueStats(),
-      ]);
-
-      if (positionResponse.success && positionResponse.data) {
-        setQueuePosition(positionResponse.data);
-      }
-
-      if (statsResponse.success && statsResponse.data) {
-        setQueueStats(statsResponse.data);
-      }
-    } catch (error: any) {
-      console.error('Erreur lors du chargement des données de queue:', error);
-      if (error.message.includes('QUEUE_NOT_FOUND')) {
-        Alert.alert(
-          'Pas dans la file d\'attente',
-          'Vous n\'êtes actuellement pas dans la file d\'attente.',
-          [{ text: 'OK' }]
+      const response = await apiService.getRendezVousActifs();
+      if (response.success && response.data) {
+        // Filtrer seulement les rendez-vous d'aujourd'hui
+        const aujourdhui = new Date().toISOString().split('T')[0];
+        const rdvDuJour = response.data.filter((rdv: RendezVous) => 
+          rdv.date_rendez_vous === aujourdhui
         );
+        // Trier par heure de rendez-vous
+        rdvDuJour.sort((a: RendezVous, b: RendezVous) => {
+          if (!a.heure_rendez_vous || !b.heure_rendez_vous) return 0;
+          return a.heure_rendez_vous.localeCompare(b.heure_rendez_vous);
+        });
+        setRendezVousDuJour(rdvDuJour);
       }
+    } catch (error) {
+      console.error('Erreur lors du chargement des rendez-vous du jour:', error);
     } finally {
       setLoading(false);
     }
@@ -118,77 +54,113 @@ const QueueScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadQueueData();
+    await loadRendezVousDuJour();
     setRefreshing(false);
   };
 
-  const formatTime = (minutes: number): string => {
-    if (minutes < 60) {
-      return `${minutes} min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}h ${remainingMinutes}min`;
+  const formatTime = (time: string): string => {
+    if (!time) return '';
+    return time.substring(0, 5); // Afficher seulement HH:MM
+  };
+
+  const formatDate = (date: string): string => {
+    if (!date) return '';
+    const dateObj = new Date(date);
+    return dateObj.toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status?.toUpperCase()) {
       case 'EN_ATTENTE':
         return '#f39c12';
-      case 'EN_COURS':
+      case 'EN_CONSULTATION':
         return '#3498db';
       case 'TERMINE':
         return '#27ae60';
-      case 'ANNULE':
-        return '#e74c3c';
       default:
         return '#95a5a6';
     }
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
+    switch (status?.toUpperCase()) {
       case 'EN_ATTENTE':
         return 'En attente';
-      case 'EN_COURS':
-        return 'En cours';
+      case 'EN_CONSULTATION':
+        return 'En consultation';
       case 'TERMINE':
         return 'Terminé';
-      case 'ANNULE':
-        return 'Annulé';
       default:
         return 'Inconnu';
     }
   };
+
+  const handleVoirFile = (rendezVous: RendezVous) => {
+    setSelectedRdv(rendezVous);
+  };
+
+  const handleBackFromFollow = () => {
+    setSelectedRdv(null);
+  };
+
+  const renderRendezVous = ({ item }: { item: RendezVous }) => (
+    <View style={styles.rendezVousCard}>
+      <View style={styles.rendezVousHeader}>
+        <View style={styles.serviceInfo}>
+          <MaterialIcons name="local-hospital" size={20} color="#3498db" />
+          <Text style={styles.serviceName}>{item.service?.nom || 'Service inconnu'}</Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.statut?.nom || '') }]}>
+          <Text style={styles.statusBadgeText}>
+            {getStatusText(item.statut?.nom || '')}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.rendezVousDetails}>
+        <View style={styles.detailRow}>
+          <MaterialIcons name="event" size={16} color="#7f8c8d" />
+          <Text style={styles.detailLabel}>Date:</Text>
+          <Text style={styles.detailValue}>{formatDate(item.date_rendez_vous || '')}</Text>
+        </View>
+        <View style={styles.detailRow}>
+          <MaterialIcons name="access-time" size={16} color="#7f8c8d" />
+          <Text style={styles.detailLabel}>Heure:</Text>
+          <Text style={styles.detailValue}>{formatTime(item.heure_rendez_vous || '')}</Text>
+        </View>
+        {item.motif && (
+          <View style={styles.detailRow}>
+            <MaterialIcons name="note" size={16} color="#7f8c8d" />
+            <Text style={styles.detailLabel}>Motif:</Text>
+            <Text style={styles.detailValue}>{item.motif}</Text>
+          </View>
+        )}
+      </View>
+      <TouchableOpacity 
+        style={styles.voirFileButton}
+        onPress={() => handleVoirFile(item)}
+      >
+        <MaterialIcons name="queue" size={16} color="#fff" />
+        <Text style={styles.voirFileButtonText}>Voir la file d'attente</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (selectedRdv) {
+    return <QueueFollowScreen rendezVous={selectedRdv} onBack={handleBackFromFollow} />;
+  }
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#3498db" />
-          <Text style={styles.loadingText}>Chargement de la file d'attente...</Text>
+          <Text style={styles.loadingText}>Chargement des rendez-vous...</Text>
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!queuePosition) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView 
-          contentContainerStyle={styles.emptyContainer}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          <Text style={styles.emptyTitle}>Pas dans la file d'attente</Text>
-          <Text style={styles.emptyText}>
-            Vous n'êtes actuellement pas dans la file d'attente.
-          </Text>
-          <Text style={styles.emptySubtext}>
-            Rejoignez la file d'attente en vous présentant à l'accueil.
-          </Text>
-        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -196,22 +168,21 @@ const QueueScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <MaterialIcons name="queue" size={24} color="#3498db" />
-          <Text style={styles.headerTitle}>File d'Attente</Text>
-        </View>
-        <View style={styles.connectionStatus}>
-          <MaterialIcons 
-            name={isConnected ? 'wifi' : 'wifi-off'} 
-            size={16}
-            color={isConnected ? '#27ae60' : '#e74c3c'} 
-          />
-          <Text style={styles.statusText}>
-            {isConnected ? 'Temps réel' : 'Hors ligne'}
-          </Text>
+        <View style={styles.headerTop}>
+          {onBack && (
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={onBack}
+            >
+              <MaterialIcons name="arrow-back" size={24} color="#3498db" />
+            </TouchableOpacity>
+          )}
+          <View style={styles.titleContainer}>
+            <Text style={styles.headerTitle}>Mes Rendez-vous</Text>
+            <Text style={styles.headerSubtitle}>Aujourd'hui</Text>
+          </View>
         </View>
       </View>
-
       <ScrollView 
         style={styles.content}
         refreshControl={
@@ -219,135 +190,34 @@ const QueueScreen: React.FC = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Position actuelle */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MaterialIcons name="person" size={20} color="#3498db" />
-            <Text style={styles.sectionTitle}>Votre Position</Text>
+        {rendezVousDuJour.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <MaterialIcons name="event-busy" size={64} color="#95a5a6" />
+            <Text style={styles.emptyTitle}>Aucun rendez-vous aujourd'hui</Text>
+            <Text style={styles.emptyText}>
+              Vous n'avez pas de rendez-vous programmé pour aujourd'hui.
+            </Text>
           </View>
-          <Animated.View 
-            style={[
-              styles.positionCard,
-              { transform: [{ scale: pulseAnim }] }
-            ]}
-          >
-            <Text style={styles.positionNumber}>{queuePosition.position}</Text>
-            <Text style={styles.positionLabel}>Position dans la file</Text>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(queuePosition.statut) }]}>
-              <Text style={styles.statusBadgeText}>
-                {getStatusText(queuePosition.statut)}
+        ) : (
+          <>
+            <View style={styles.summaryCard}>
+              <MaterialIcons name="today" size={20} color="#3498db" />
+              <Text style={styles.summaryText}>
+                {rendezVousDuJour.length} rendez-vous aujourd'hui
               </Text>
             </View>
-          </Animated.View>
-        </View>
-
-        {/* Informations du service */}
-        {queuePosition.service && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="local-hospital" size={20} color="#3498db" />
-              <Text style={styles.sectionTitle}>Service</Text>
-            </View>
-            <View style={styles.serviceCard}>
-              <Text style={styles.serviceName}>{queuePosition.service.nom}</Text>
-              <Text style={styles.serviceDescription}>
-                {queuePosition.service.description}
-              </Text>
-            </View>
-          </View>
+            <FlatList
+              data={rendezVousDuJour}
+              renderItem={renderRendezVous}
+              keyExtractor={(item) => item.id.toString()}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          </>
         )}
-
-        {/* Temps d'attente */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MaterialIcons name="access-time" size={20} color="#3498db" />
-            <Text style={styles.sectionTitle}>Temps d'Attente</Text>
-          </View>
-          <View style={styles.timeCard}>
-            <View style={styles.timeRow}>
-              <MaterialIcons name="schedule" size={16} color="#7f8c8d" />
-              <Text style={styles.timeLabel}>Temps estimé:</Text>
-              <Text style={styles.timeValue}>
-                {formatTime(queuePosition.tempsEstime)}
-              </Text>
-            </View>
-            <View style={styles.timeRow}>
-              <MaterialIcons name="timer" size={16} color="#7f8c8d" />
-              <Text style={styles.timeLabel}>Temps d'attente:</Text>
-              <Text style={styles.timeValue}>
-                {formatTime(queuePosition.tempsAttente)}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Statistiques de la queue */}
-        {queueStats && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <MaterialIcons name="analytics" size={20} color="#3498db" />
-              <Text style={styles.sectionTitle}>Statistiques</Text>
-            </View>
-            <View style={styles.statsCard}>
-              <View style={styles.statRow}>
-                <MaterialIcons name="people" size={16} color="#7f8c8d" />
-                <Text style={styles.statLabel}>Total patients:</Text>
-                <Text style={styles.statValue}>{queueStats.totalPatients}</Text>
-              </View>
-              <View style={styles.statRow}>
-                <MaterialIcons name="schedule" size={16} color="#7f8c8d" />
-                <Text style={styles.statLabel}>Temps moyen:</Text>
-                <Text style={styles.statValue}>
-                  {formatTime(queueStats.averageWaitTime)}
-                </Text>
-              </View>
-              <View style={styles.statRow}>
-                <MaterialIcons name="update" size={16} color="#7f8c8d" />
-                <Text style={styles.statLabel}>Dernière mise à jour:</Text>
-                <Text style={styles.statValue}>
-                  {new Date(queueStats.lastUpdate).toLocaleTimeString('fr-FR')}
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Informations importantes */}
-        <View style={styles.infoContainer}>
-          <View style={styles.infoHeader}>
-            <MaterialIcons name="info" size={20} color="#f39c12" />
-            <Text style={styles.infoTitle}>Informations importantes</Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialIcons name="location-on" size={16} color="#7f8c8d" />
-            <Text style={styles.infoText}>
-              Restez dans la zone d'attente pour ne pas perdre votre place
-            </Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialIcons name="record-voice-over" size={16} color="#7f8c8d" />
-            <Text style={styles.infoText}>
-              Vous serez appelé par votre nom ou numéro de dossier
-            </Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialIcons name="schedule" size={16} color="#7f8c8d" />
-            <Text style={styles.infoText}>
-              Les temps d'attente sont estimatifs et peuvent varier
-            </Text>
-          </View>
-          <View style={styles.infoItem}>
-            <MaterialIcons name="emergency" size={16} color="#7f8c8d" />
-            <Text style={styles.infoText}>
-              En cas d'urgence, présentez-vous à l'accueil
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-
 
 export default QueueScreen; 

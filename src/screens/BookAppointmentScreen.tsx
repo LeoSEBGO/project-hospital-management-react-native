@@ -38,6 +38,9 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [horairesDisponibles, setHorairesDisponibles] = useState<HoraireDisponible[]>([]);
   const [loadingHoraires, setLoadingHoraires] = useState(false);
+  const [datesOccupees, setDatesOccupees] = useState<string[]>([]);
+  const [loadingDatesOccupees, setLoadingDatesOccupees] = useState(false);
+  const [refreshingData, setRefreshingData] = useState(false);
   const [commentaire, setCommentaire] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -47,12 +50,24 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
     loadServices();
   }, []);
 
-  // Charger les horaires disponibles quand la date ou le service change
+  // Rafraîchissement lors du changement de service ou de date
   useEffect(() => {
     if (selectedService && selectedDate) {
-      loadHorairesDisponibles();
+      setSelectedTime(new Date(selectedDate)); // Réinitialisation
+      loadHorairesDisponibles(); // Rechargement automatique
+    } else {
+      setHorairesDisponibles([]); // Nettoyage
     }
   }, [selectedService, selectedDate]);
+
+  // Charger les dates occupées quand le service change
+  useEffect(() => {
+    if (selectedService) {
+      loadDatesOccupees();
+    } else {
+      setDatesOccupees([]);
+    }
+  }, [selectedService]);
 
   const loadServices = async () => {
     try {
@@ -79,21 +94,76 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
     }
   };
 
+  const loadDatesOccupees = async () => {
+    if (!selectedService) {
+      console.log('[BOOK_APPOINTMENT] Pas de service sélectionné, dates occupées non chargées');
+      return;
+    }
+
+    try {
+      setLoadingDatesOccupees(true);
+      console.log(`[BOOK_APPOINTMENT] Chargement des dates occupées pour le service ${selectedService.nom} (ID: ${selectedService.id})`);
+      
+      const response = await apiService.getDatesOccupees(selectedService.id);
+      
+      if (response.success && response.data) {
+        const dates = response.data.dates;
+        console.log(`[BOOK_APPOINTMENT] Dates occupées chargées: ${dates.length} dates`);
+        if (dates.length > 0) {
+          console.log(`[BOOK_APPOINTMENT] Exemples de dates occupées: ${dates.slice(0, 5).join(', ')}`);
+        }
+        setDatesOccupees(dates);
+      } else {
+        console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des dates occupées:', response.message);
+        setDatesOccupees([]);
+      }
+    } catch (error: any) {
+      console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des dates occupées:', error);
+      setDatesOccupees([]);
+    } finally {
+      setLoadingDatesOccupees(false);
+    }
+  };
+
   const loadHorairesDisponibles = async () => {
-    if (!selectedService) return;
+    if (!selectedService) {
+      console.log('[BOOK_APPOINTMENT] Pas de service sélectionné, horaires non chargés');
+      return;
+    }
 
     try {
       setLoadingHoraires(true);
+      console.log(`[BOOK_APPOINTMENT] Chargement des horaires pour le service ${selectedService.nom} (ID: ${selectedService.id})`);
+      
       const dateStr = selectedDate.toISOString().split('T')[0];
+      console.log(`[BOOK_APPOINTMENT] Date sélectionnée: ${dateStr}`);
+      
       const response = await apiService.getHorairesDisponibles(selectedService.id, dateStr);
       
       if (response.success && response.data) {
-        setHorairesDisponibles(response.data.horaires);
+        const horaires = response.data.horaires;
+        const disponibles = horaires.filter((h: HoraireDisponible) => h.disponible);
+        const grisees = horaires.filter((h: HoraireDisponible) => !h.disponible);
+        
+        console.log(`[BOOK_APPOINTMENT] Horaires chargés: ${horaires.length} créneaux`);
+        console.log(`[BOOK_APPOINTMENT] Disponibles: ${disponibles.length}, Grisées: ${grisees.length}`);
+        
+        if (disponibles.length > 0) {
+          console.log(`[BOOK_APPOINTMENT] Exemples disponibles: ${disponibles.slice(0, 3).map((h: HoraireDisponible) => h.heure).join(', ')}`);
+        }
+        
+        if (grisees.length > 0) {
+          console.log(`[BOOK_APPOINTMENT] Exemples grisés: ${grisees.slice(0, 3).map((h: HoraireDisponible) => h.heure).join(', ')}`);
+        }
+        
+        setHorairesDisponibles(horaires);
       } else {
         console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des horaires:', response.message);
+        setHorairesDisponibles([]);
       }
     } catch (error: any) {
       console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des horaires:', error);
+      setHorairesDisponibles([]);
     } finally {
       setLoadingHoraires(false);
     }
@@ -102,9 +172,22 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
   const handleDateChange = (event: any, date?: Date) => {
     setShowDatePicker(false);
     if (date) {
+      const dateStr = date.toISOString().split('T')[0];
+      console.log(`[BOOK_APPOINTMENT] Date sélectionnée: ${dateStr}`);
+      
+      // Vérifier si la date est occupée
+      if (isDateOccupee(date)) {
+        console.log(`[BOOK_APPOINTMENT] Date occupée détectée: ${dateStr}`);
+        Alert.alert(
+          'Date occupée',
+          'Cette date a déjà des rendez-vous. Veuillez sélectionner une autre date.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       setSelectedDate(date);
-      // Réinitialiser l'heure sélectionnée
-      setSelectedTime(date);
+      // L'useEffect se chargera de recharger les horaires et réinitialiser l'heure
     }
   };
 
@@ -132,16 +215,38 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
   };
 
   const selectService = (service: Service) => {
+    console.log(`[BOOK_APPOINTMENT] Service sélectionné: ${service.nom} (ID: ${service.id})`);
     setSelectedService(service);
     setShowServicePicker(false);
+    // L'useEffect se chargera de recharger les horaires et réinitialiser l'heure
   };
 
-  const selectTime = (heure: string) => {
+  const selectTime = async (heure: string) => {
     const [hours, minutes] = heure.split(':').map(Number);
     const newTime = new Date(selectedDate);
     newTime.setHours(hours, minutes, 0, 0);
     setSelectedTime(newTime);
     setShowTimeModal(false);
+    console.log(`[BOOK_APPOINTMENT] Heure sélectionnée: ${heure}`);
+    
+    // Rafraîchir les données après la sélection
+    try {
+      setRefreshingData(true);
+      console.log(`[BOOK_APPOINTMENT] Rafraîchissement des données après sélection de ${heure}`);
+      
+      // Rafraîchir les horaires
+      await loadHorairesDisponibles();
+      console.log(`[BOOK_APPOINTMENT] Horaires rafraîchis avec succès`);
+      
+      // Rafraîchir les dates occupées
+      await loadDatesOccupees();
+      console.log(`[BOOK_APPOINTMENT] Dates occupées rafraîchies avec succès`);
+      
+    } catch (error) {
+      console.error(`[BOOK_APPOINTMENT] Erreur lors du rafraîchissement des données:`, error);
+    } finally {
+      setRefreshingData(false);
+    }
   };
 
   const formatDate = (date: Date) => {
@@ -167,9 +272,39 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
     return date.toTimeString().slice(0, 5); // Format HH:MM
   };
 
+  const isDateOccupee = (date: Date): boolean => {
+    const dateStr = date.toISOString().split('T')[0];
+    return datesOccupees.includes(dateStr);
+  };
+
+  const isTimeSelected = (): boolean => {
+    if (!selectedService) return false;
+    const heureSelectionnee = formatTimeForAPI(selectedTime);
+    const heureParDefaut = formatTimeForAPI(new Date(selectedDate));
+    return heureSelectionnee !== heureParDefaut;
+  };
+
+
+
   const handleBookAppointment = async () => {
     if (!selectedService) {
       Alert.alert('Erreur', 'Veuillez sélectionner un service');
+      return;
+    }
+
+    // Vérifier qu'une heure est sélectionnée
+    const heureSelectionnee = formatTimeForAPI(selectedTime);
+    const heureParDefaut = formatTimeForAPI(new Date(selectedDate));
+    
+    if (heureSelectionnee === heureParDefaut) {
+      Alert.alert('Erreur', 'Veuillez sélectionner une heure de rendez-vous');
+      return;
+    }
+
+    // Vérifier que l'heure sélectionnée est disponible
+    const heureDisponible = horairesDisponibles.find(h => h.heure === heureSelectionnee);
+    if (!heureDisponible || !heureDisponible.disponible) {
+      Alert.alert('Erreur', 'Cette heure n\'est plus disponible. Veuillez sélectionner une autre heure.');
       return;
     }
 
@@ -234,41 +369,65 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
     </TouchableOpacity>
   );
 
-  const renderTimeItem = ({ item }: { item: HoraireDisponible }) => (
-    <TouchableOpacity
-      style={[
-        styles.timeItem,
-        !item.disponible && styles.timeItemDisabled
-      ]}
-      onPress={() => item.disponible && selectTime(item.heure)}
-      disabled={!item.disponible}
-    >
-      <Text style={[
-        styles.timeItemText,
-        !item.disponible && styles.timeItemTextDisabled
-      ]}>
-        {item.heure}
-      </Text>
-      {!item.disponible && (
-        <MaterialIcons name="block" size={16} color="#95a5a6" />
-      )}
-    </TouchableOpacity>
-  );
+  const renderTimeItem = ({ item }: { item: HoraireDisponible }) => {
+    const isSelected = selectedTime && formatTimeForAPI(selectedTime) === item.heure;
+    
+    return (
+      <TouchableOpacity
+        style={[
+          styles.timeItem,
+          isSelected && styles.timeItemSelected
+        ]}
+        onPress={() => selectTime(item.heure)}
+        accessibilityLabel={`Sélectionner ${item.heure}`}
+        accessibilityHint="Appuyez pour sélectionner cette heure"
+      >
+        <View style={styles.timeItemContent}>
+          <Text style={[
+            styles.timeItemText,
+            isSelected && styles.timeItemTextSelected
+          ]}>
+            {item.heure}
+          </Text>
+          {isSelected && (
+            <View style={styles.selectedIndicator}>
+              <MaterialIcons name="check-circle" size={16} color="#27ae60" />
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTimeSection = (periode: 'matin' | 'apres-midi') => {
-    const horairesPeriode = horairesDisponibles.filter(h => h.periode === periode);
+    // Filtrer seulement les heures disponibles pour cette période
+    const horairesDisponiblesPeriode = horairesDisponibles.filter(h => h.periode === periode && h.disponible);
     const titre = periode === 'matin' ? 'Matin (8h-12h)' : 'Après-midi (15h-00h)';
     
     return (
       <View style={styles.timeSection}>
         <Text style={styles.timeSectionTitle}>{titre}</Text>
-        <View style={styles.timeGrid}>
-          {horairesPeriode.map((horaire, index) => (
-            <View key={index} style={styles.timeItemContainer}>
-              {renderTimeItem({ item: horaire })}
-            </View>
-          ))}
-        </View>
+        {loadingHoraires ? (
+          <View style={styles.loadingHorairesContainer}>
+            <ActivityIndicator size="small" color="#3498db" />
+            <Text style={styles.loadingHorairesText}>Chargement des horaires...</Text>
+          </View>
+        ) : horairesDisponiblesPeriode.length > 0 ? (
+          <View style={styles.timeGrid}>
+            {horairesDisponiblesPeriode.map((horaire, index) => (
+              <View key={index} style={styles.timeItemContainer}>
+                {renderTimeItem({ item: horaire })}
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.noHorairesContainer}>
+            <MaterialIcons name="schedule" size={24} color="#95a5a6" />
+            <Text style={styles.noHorairesText}>
+              Aucun créneau disponible pour cette période
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -307,63 +466,97 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
         {/* Formulaire de rendez-vous */}
         <View style={styles.formContainer}>
           <Text style={styles.formTitle}>Détails du Rendez-vous</Text>
+          
+
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Service *</Text>
             <TouchableOpacity
-              style={styles.dateTimeButton}
+              style={[
+                styles.dateTimeButton,
+                !selectedService && styles.inputError
+              ]}
               onPress={showServicePickerModal}
             >
-              <MaterialIcons name="local-hospital" size={20} color="#3498db" />
-              <Text style={styles.dateTimeButtonText}>
+              <MaterialIcons name="local-hospital" size={20} color={!selectedService ? "#e74c3c" : "#3498db"} />
+              <Text style={[
+                styles.dateTimeButtonText,
+                !selectedService && styles.inputErrorText
+              ]}>
                 {selectedService ? selectedService.nom : 'Sélectionner un service'}
               </Text>
               <MaterialIcons name="keyboard-arrow-down" size={20} color="#7f8c8d" />
             </TouchableOpacity>
-            {selectedService && (
+            {selectedService ? (
               <Text style={styles.helpText}>
                 {selectedService.description}
               </Text>
-            )}
+            ) : null}
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Date *</Text>
             <TouchableOpacity
-              style={styles.dateTimeButton}
+              style={[
+                styles.dateTimeButton,
+                loadingDatesOccupees && styles.dateTimeButtonDisabled
+              ]}
               onPress={showDatePickerModal}
+              disabled={loadingDatesOccupees || !selectedService}
             >
               <MaterialIcons name="event" size={20} color="#3498db" />
-              <Text style={styles.dateTimeButtonText}>
-                {formatDate(selectedDate)}
+              <Text style={[
+                styles.dateTimeButtonText,
+                loadingDatesOccupees && styles.dateTimeButtonTextDisabled
+              ]}>
+                {loadingDatesOccupees ? 'Chargement...' : formatDate(selectedDate)}
               </Text>
               <MaterialIcons name="keyboard-arrow-down" size={20} color="#7f8c8d" />
             </TouchableOpacity>
             <Text style={styles.helpText}>
-              Sélectionnez la date de votre rendez-vous
+              {loadingDatesOccupees 
+                ? 'Vérification des dates disponibles...' 
+                : selectedService 
+                  ? 'Sélectionnez la date de votre rendez-vous' 
+                  : 'Sélectionnez d\'abord un service'
+              }
             </Text>
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Heure *</Text>
-                          <TouchableOpacity
-                style={styles.dateTimeButton}
-                onPress={openTimeModal}
-              >
+            <TouchableOpacity
+              style={[
+                styles.dateTimeButton,
+                loadingHoraires && styles.dateTimeButtonDisabled,
+                !selectedService && styles.dateTimeButtonDisabled
+              ]}
+              onPress={openTimeModal}
+              disabled={loadingHoraires || !selectedService}
+            >
               <MaterialIcons name="access-time" size={20} color="#3498db" />
-              <Text style={styles.dateTimeButtonText}>
-                {formatTime(selectedTime)}
+              <Text style={[
+                styles.dateTimeButtonText,
+                loadingHoraires && styles.dateTimeButtonTextDisabled,
+                !selectedService && styles.dateTimeButtonTextDisabled
+              ]}>
+                {loadingHoraires 
+                  ? 'Chargement...' 
+                  : !selectedService 
+                    ? 'Sélectionnez d\'abord un service'
+                    : formatTime(selectedTime)
+                }
               </Text>
               <MaterialIcons name="keyboard-arrow-down" size={20} color="#7f8c8d" />
             </TouchableOpacity>
             <Text style={styles.helpText}>
-              Sélectionnez l'heure de votre rendez-vous
+              {loadingHoraires 
+                ? 'Chargement des horaires disponibles...' 
+                : !selectedService 
+                  ? 'Sélectionnez d\'abord un service'
+                  : 'Sélectionnez l\'heure de votre rendez-vous'
+              }
             </Text>
-            {loadingHoraires && (
-              <Text style={styles.helpText}>
-                Chargement des horaires disponibles...
-              </Text>
-            )}
           </View>
 
           <View style={styles.inputContainer}>
@@ -380,9 +573,9 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
           </View>
 
           <TouchableOpacity
-            style={[styles.bookButton, loading && styles.bookButtonDisabled]}
+            style={[styles.bookButton, (loading || !selectedService || !isTimeSelected()) && styles.bookButtonDisabled]}
             onPress={handleBookAppointment}
-            disabled={loading || !selectedService}
+            disabled={loading || !selectedService || !isTimeSelected()}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
@@ -457,6 +650,26 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
                 <MaterialIcons name="close" size={24} color="#7f8c8d" />
               </TouchableOpacity>
             </View>
+            
+            {/* Indicateur du nombre d'heures disponibles */}
+            <View style={styles.availableHoursIndicator}>
+              <MaterialIcons name="schedule" size={16} color="#27ae60" />
+              <Text style={styles.availableHoursText}>
+                {refreshingData ? 'Rafraîchissement...' : `${horairesDisponibles.filter(h => h.disponible).length} créneaux disponibles`}
+              </Text>
+              {refreshingData && (
+                <ActivityIndicator size="small" color="#27ae60" style={{ marginLeft: 8 }} />
+              )}
+            </View>
+            
+            {isTimeSelected() && (
+              <View style={styles.selectedTimeIndicator}>
+                <MaterialIcons name="check-circle" size={16} color="#27ae60" />
+                <Text style={styles.selectedTimeText}>
+                  Heure sélectionnée: {formatTime(selectedTime)}
+                </Text>
+              </View>
+            )}
             <ScrollView style={styles.timeList} showsVerticalScrollIndicator={false}>
               {renderTimeSection('matin')}
               {renderTimeSection('apres-midi')}

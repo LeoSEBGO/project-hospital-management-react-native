@@ -152,31 +152,64 @@ export interface UpdateRendezVousRequest {
 
 // Types pour la queue en temps réel
 export interface QueuePosition {
-  id: number;
+  id: string;
   patientId: number;
-  patient?: Patient;
   position: number;
   serviceId: number;
-  service?: Service;
-  statut: 'EN_ATTENTE' | 'EN_COURS' | 'TERMINE' | 'ANNULE';
+  service: {
+    id: number;
+    nom: string;
+    description: string;
+  };
+  statut: string;
   tempsEstime: number; // en minutes
   tempsAttente: number; // en minutes
+  heureRendezVous: string;
+  minutesRestantes: number;
+  totalPatients: number;
   createdAt: string;
   updatedAt: string;
 }
 
+export interface QueueData {
+  date: string;
+  totalRendezVous: number;
+  positions: QueuePosition[];
+  resume: {
+    prochainRendezVous: QueuePosition;
+    totalPatientsEnAttente: number;
+    tempsAttenteTotal: number;
+  };
+}
+
 export interface QueueUpdate {
   type: 'POSITION_CHANGE' | 'STATUS_CHANGE' | 'NEW_PATIENT' | 'PATIENT_FINISHED';
-  queuePosition: QueuePosition;
+  queueData: QueueData;
   message: string;
   timestamp: string;
 }
 
 export interface QueueStats {
-  totalPatients: number;
-  averageWaitTime: number; // en minutes
-  estimatedWaitTime: number; // en minutes pour le patient actuel
+  date: string;
+  totalRendezVous: number;
+  totalPatientsGlobal: number;
+  averageWaitTimeGlobal: number;
+  totalWaitTime: number;
   lastUpdate: string;
+  services: Array<{
+    serviceId: number;
+    serviceName: string;
+    totalPatients: number;
+    averageWaitTime: number;
+    estimatedWaitTime: number;
+    patientPosition: number;
+    heureRendezVous: string;
+    statut: string;
+  }>;
+  resume: {
+    prochainRendezVous: any;
+    servicesAvecPlusDAttente: any[];
+  };
 }
 
 // Types pour les notifications temps réel
@@ -375,7 +408,7 @@ class ApiService {
   }
 
   // Méthodes pour la queue
-  async getQueuePosition(): Promise<ApiResponse<QueuePosition>> {
+  async getQueuePosition(): Promise<ApiResponse<QueueData>> {
     try {
       const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.POSITION));
       return response.data;
@@ -466,6 +499,19 @@ class ApiService {
         params: {
           service_id: serviceId,
           date_rendez_vous: date
+        }
+      });
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async getDatesOccupees(serviceId: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.api.get(getApiUrl('/patients/me/rendez-vous/dates-occupees'), {
+        params: {
+          service_id: serviceId
         }
       });
       return response.data;

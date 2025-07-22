@@ -272,6 +272,36 @@ const PatientDashboardScreen: React.FC = () => {
     });
   };
 
+  // Fonction pour vérifier si une date est aujourd'hui
+  const isToday = (dateString: string) => {
+    const today = new Date();
+    const date = new Date(dateString);
+    return date.toDateString() === today.toDateString();
+  };
+
+  // Fonction pour vérifier si une date est dans le futur (après aujourd'hui)
+  const isFutureDate = (dateString: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Réinitialiser l'heure à 00:00:00
+    const date = new Date(dateString);
+    date.setHours(0, 0, 0, 0);
+    return date > today;
+  };
+
+  // Fonction pour filtrer les rendez-vous du jour
+  const getRendezVousToday = () => {
+    return rendezVous.filter(rdv => 
+      rdv.date_rendez_vous && isToday(rdv.date_rendez_vous)
+    );
+  };
+
+  // Fonction pour filtrer les rendez-vous des jours suivants
+  const getRendezVousFuture = () => {
+    return rendezVous.filter(rdv => 
+      rdv.date_rendez_vous && isFutureDate(rdv.date_rendez_vous)
+    );
+  };
+
   // Helper functions to get statut details
   const getStatutColor = (statutNom: string) => {
     switch (statutNom) {
@@ -361,7 +391,7 @@ const PatientDashboardScreen: React.FC = () => {
   }
 
   if (currentScreen === 'queue') {
-    return <QueueScreen />;
+    return <QueueScreen onBack={goBackToDashboard} />;
   }
 
   if (currentScreen === 'notifications') {
@@ -460,8 +490,8 @@ const PatientDashboardScreen: React.FC = () => {
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#3498db" />
             </View>
-          ) : rendezVous.length > 0 ?
-            rendezVous
+          ) : getRendezVousToday().length > 0 ?
+            getRendezVousToday()
               .sort((a, b) => new Date(a.ajoute_le).getTime() - new Date(b.ajoute_le).getTime())
               .map((rdv) => (
                 <TouchableOpacity 
@@ -494,7 +524,7 @@ const PatientDashboardScreen: React.FC = () => {
               ))
           : (
             <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>Aucun rendez-vous à venir</Text>
+              <Text style={styles.noDataText}>Aucun rendez-vous aujourd'hui</Text>
             </View>
           )}
         </View>
@@ -527,10 +557,9 @@ const PatientDashboardScreen: React.FC = () => {
         {/* Rendez-vous prochains */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Rendez-vous Prochains</Text>
-          {rendezVous.length > 0 ? (
-            rendezVous
-              .filter(rdv => rdv.statut?.nom === 'EN_ATTENTE' || rdv.statut?.nom === 'EN_CONSULTATION')
-              .sort((a, b) => new Date(a.ajoute_le).getTime() - new Date(b.ajoute_le).getTime())
+          {getRendezVousFuture().length > 0 ? (
+            getRendezVousFuture()
+              .sort((a, b) => new Date(a.date_rendez_vous || '').getTime() - new Date(b.date_rendez_vous || '').getTime())
               .slice(0, 3)
               .map((rdv) => (
                 <View key={rdv.id} style={styles.rendezVousCard}>
@@ -600,36 +629,6 @@ const PatientDashboardScreen: React.FC = () => {
               <Text style={styles.actionDescription}>Rendez-vous</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Historique des statuts */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Historique des Statuts</Text>
-          {statutHistorique.length > 0 ? (
-            statutHistorique.map((historique, index) => (
-              <View key={historique.id} style={styles.historiqueCard}>
-                <View style={styles.historiqueHeader}>
-                  <Text style={styles.historiqueDate}>
-                    {formatDate(historique.modifie_le)}
-                  </Text>
-                  <View style={[styles.historiqueBadge, { backgroundColor: getStatutColor(historique.statut?.nom || '') }]}>
-                    <Text style={styles.historiqueBadgeText}>
-                      {getStatutDisplayName(historique.statut?.nom || 'Statut inconnu')}
-                    </Text>
-                  </View>
-                </View>
-                {historique.modifie_par && (
-                  <Text style={styles.historiqueCommentaire}>
-                    Modifié par: {historique.modifie_par.prenom} {historique.modifie_par.nom}
-                  </Text>
-                )}
-              </View>
-            ))
-          ) : (
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>Aucun historique disponible</Text>
-            </View>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>

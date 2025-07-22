@@ -2,7 +2,7 @@
 
 Application mobile React Native destinée aux **patients** pour suivre leur statut hospitalier, connectée à l'API Node.js.
 
-## 🚀 Fonctionnalités
+## Fonctionnalités
 
 - **Authentification patient** avec email et mot de passe
 - **Suivi du statut actuel** du patient
@@ -13,12 +13,11 @@ Application mobile React Native destinée aux **patients** pour suivre leur stat
 - **Notifications temps réel** pour les mises à jour importantes
 - **WebSocket temps réel** pour les mises à jour instantanées
 - **Informations personnelles** du patient
-- **Interface utilisateur moderne** et intuitive
 - **Stockage local sécurisé** des données d'authentification
 - **Gestion d'erreurs robuste**
 - **Actualisation en temps réel** (pull-to-refresh)
 
-## 📋 Prérequis
+## Prérequis
 
 - Node.js (version 18 ou supérieure)
 - npm ou yarn
@@ -27,7 +26,7 @@ Application mobile React Native destinée aux **patients** pour suivre leur stat
 - Xcode (pour iOS - macOS uniquement)
 - API Node.js en cours d'exécution
 
-## 🛠️ Installation
+## Installation
 
 ### 1. Cloner le projet
 
@@ -42,14 +41,9 @@ cd hosmapp
 npm install
 ```
 
-### 3. Configuration de l'API
-
-Assurez-vous que l'API Node.js est en cours d'exécution sur le port 3000. Si ce n'est pas le cas, modifiez la configuration dans `src/config/api.ts` :
-
 ```typescript
 BASE_URL: __DEV__ 
   ? 'http://localhost:3000/api'  // Développement local
-  : 'http://your-production-api.com/api', // Production
 ```
 
 ### 4. Configuration pour Android
@@ -58,8 +52,7 @@ Pour le développement Android, vous devrez peut-être modifier l'URL de l'API p
 
 ```typescript
 BASE_URL: __DEV__ 
-  ? 'http://192.168.1.100:3000/api'  // Remplacez par votre IP
-  : 'http://your-production-api.com/api',
+  ? 'http://192.168.1.100:3000/api'
 ```
 
 ### 5. Démarrer l'application
@@ -69,33 +62,12 @@ BASE_URL: __DEV__
 npm run android
 ```
 
-#### Pour iOS :
-```bash
-npm run ios
-```
-
 #### Démarrer le bundler Metro :
 ```bash
 npm start
 ```
 
-## 📱 Structure de l'Application
-
-```
-src/
-├── config/
-│   └── api.ts                    # Configuration de l'API
-├── contexts/
-│   └── AuthContext.tsx           # Contexte d'authentification patient
-├── services/
-│   └── api.ts                    # Service API centralisé
-├── screens/
-│   ├── PatientLoginScreen.tsx    # Écran de connexion patient
-│   └── PatientDashboardScreen.tsx # Tableau de bord patient
-└── components/                   # Composants réutilisables (à créer)
-```
-
-## 🔧 Configuration
+## Configuration
 
 ### Variables d'environnement
 
@@ -115,7 +87,7 @@ Le fichier `src/config/api.ts` contient toute la configuration de l'API :
 - Messages d'erreur personnalisés
 - Configuration CORS
 
-## 🔐 Authentification Patient
+## Authentification Patient
 
 L'application utilise un système d'authentification spécifique aux patients :
 
@@ -132,7 +104,7 @@ L'application utilise un système d'authentification spécifique aux patients :
 4. Si valides, un token JWT est généré
 5. Le patient accède à son tableau de bord
 
-## 📊 Fonctionnalités Patient
+## Fonctionnalités Patient
 
 ### Statut Actuel
 - Affichage du statut actuel du patient
@@ -180,7 +152,7 @@ L'application utilise un système d'authentification spécifique aux patients :
 - Historique complet des notifications
 - Interface intuitive avec indicateurs visuels
 
-## 🎨 Interface Utilisateur
+## Interface Utilisateur
 
 L'application utilise un design moderne avec :
 
@@ -191,7 +163,7 @@ L'application utilise un design moderne avec :
 - **Accessibilité** : Support des lecteurs d'écran
 - **Pull-to-refresh** : Actualisation facile des données
 
-## 🚨 Gestion d'Erreurs
+## Gestion d'Erreurs
 
 L'application gère plusieurs types d'erreurs :
 
@@ -201,7 +173,7 @@ L'application gère plusieurs types d'erreurs :
 - **Erreurs serveur** : Problèmes côté API
 - **Patient non trouvé** : Email/mot de passe incorrect
 
-## 🔧 Développement
+## Développement
 
 ### Architecture Temps Réel
 
@@ -245,7 +217,7 @@ heartbeatInterval: 30000, // 30 secondes
 1. Éditer `src/config/api.ts`
 2. Redémarrer l'application si nécessaire
 
-## 🧪 Tests
+## Tests
 
 ```bash
 # Lancer les tests
@@ -255,7 +227,7 @@ npm test
 npm run test:watch
 ```
 
-## 📦 Build et Déploiement
+## Build et Déploiement
 
 ### Build Android
 
@@ -270,56 +242,3 @@ cd android
 cd ios
 xcodebuild -workspace hosmapp.xcworkspace -scheme hosmapp -configuration Release
 ```
-
-## 🤝 Contribution
-
-1. Fork le projet
-2. Créer une branche feature (`git checkout -b feature/AmazingFeature`)
-3. Commit les changements (`git commit -m 'Add some AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrir une Pull Request
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
-
-## 🆘 Support
-
-Pour toute question ou problème :
-
-1. Vérifiez la documentation
-2. Consultez les issues existantes
-3. Créez une nouvelle issue avec les détails du problème
-
-## 🔄 Mises à jour
-
-Pour mettre à jour l'application :
-
-```bash
-# Mettre à jour les dépendances
-npm update
-
-# Vérifier les vulnérabilités
-npm audit
-
-# Corriger les vulnérabilités
-npm audit fix
-```
-
-## 📱 Utilisation
-
-### Pour les Patients
-
-1. **Télécharger l'application** depuis l'App Store ou Google Play
-2. **Se connecter** avec le numéro de dossier et le téléphone
-3. **Consulter le statut actuel** sur le tableau de bord
-4. **Prendre des rendez-vous** en sélectionnant un service
-5. **Gérer ses rendez-vous** (voir, annuler)
-6. **Voir l'historique** des changements de statut
-7. **Actualiser** en tirant vers le bas pour les mises à jour
-
-### Sécurité
-
-- Les données sont transmises de manière sécurisée via HTTPS
-- Les tokens d'authentification sont stockés localement de manière sécurisée
-- Aucune donnée sensible n'est partagée avec des tiers
