@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 export const API_CONFIG = {
   // URL de base de l'API - à adapter selon votre environnement
   BASE_URL: __DEV__ 
-    ? 'http://10.18.45.231:3000/api'  // Pour développement local
+    ? 'http://192.168.11.108:3000/api'  // Pour développement local
     : 'http://localhost:3000/api',
 
   // Timeout des requêtes (en millisecondes)
@@ -150,10 +150,6 @@ export const getEnvironmentConfig = () => {
   let apiUrl = API_CONFIG.BASE_URL;
   
   if (isDevelopment()) {
-    // En développement, essayer de détecter l'IP automatiquement
-    // Pour les émulateurs Android, utiliser 10.0.2.2
-    // Pour les émulateurs iOS, utiliser localhost
-    // Pour les appareils physiques, utiliser l'IP de la machine
     if (Platform.OS === 'android') {
       apiUrl = 'http://10.0.2.2:3000/api';
     } else if (Platform.OS === 'ios') {

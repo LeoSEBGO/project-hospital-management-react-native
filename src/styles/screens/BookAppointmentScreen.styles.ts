@@ -21,6 +21,7 @@ export default StyleSheet.create({
     elevation: 5,
   },
   headerTop: {
+    marginTop: 5,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -408,6 +409,12 @@ export default StyleSheet.create({
     color: '#2c3e50',
     lineHeight: 20,
     marginBottom: 8,
+  },
+  inputError: {
+    borderColor: '#e74c3c',
+  },
+  inputErrorText: {
+    color: '#e74c3c',
   },
 
 }); 

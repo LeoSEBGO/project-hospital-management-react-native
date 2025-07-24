@@ -15,7 +15,7 @@ export const patientLoginStyles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: typography.fontSize['3xl'],
+    fontSize: typography.fontSize['2xl'],
     fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.sm,

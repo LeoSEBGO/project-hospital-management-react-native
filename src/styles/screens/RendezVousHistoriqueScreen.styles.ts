@@ -14,6 +14,7 @@ export default StyleSheet.create({
     borderBottomColor: '#e0e0e0',
   },
   headerTop: {
+    marginTop: 5,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,

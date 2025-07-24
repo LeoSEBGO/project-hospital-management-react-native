@@ -21,6 +21,7 @@ export default StyleSheet.create({
     elevation: 5,
   },
   headerTop: {
+    marginTop: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

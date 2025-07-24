@@ -485,7 +485,7 @@ const PatientDashboardScreen: React.FC = () => {
 
         {/* Statut actuel -> Liste des rendez-vous */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rendez-vous à venir</Text>
+          <Text style={styles.sectionTitle}>Rendez-vous du jour</Text>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#3498db" />

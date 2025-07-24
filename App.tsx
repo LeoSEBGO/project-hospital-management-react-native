@@ -9,6 +9,7 @@ import { StatusBar, StyleSheet, useColorScheme, View, ActivityIndicator } from '
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import PatientLoginScreen from './src/screens/PatientLoginScreen';
 import PatientDashboardScreen from './src/screens/PatientDashboardScreen';
+import {SafeAreaView} from 'react-native';
 
 // Composant principal de l'application
 const AppContent: React.FC = () => {
@@ -25,13 +26,13 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar 
         barStyle={isDarkMode ? 'light-content' : 'dark-content'} 
         backgroundColor={isDarkMode ? '#2c3e50' : '#fff'}
       />
       {isAuthenticated ? <PatientDashboardScreen /> : <PatientLoginScreen />}
-    </View>
+    </SafeAreaView>
   );
 };
 

@@ -12,6 +12,7 @@ export default StyleSheet.create({
     borderBottomColor: '#eee',
   },
   headerTop: {
+    marginTop: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

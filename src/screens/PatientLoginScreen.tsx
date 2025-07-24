@@ -162,8 +162,8 @@ const PatientLoginScreen: React.FC = () => {
     >
       <ScrollView contentContainerStyle={patientLoginStyles.scrollContainer}>
         <View style={patientLoginStyles.content}>
-          <Text style={patientLoginStyles.title}>HosMApp</Text>
-          <Text style={patientLoginStyles.subtitle}>Suivi Patient</Text>
+          <Text style={patientLoginStyles.title}>HOSMAPP</Text>
+          <Text style={patientLoginStyles.subtitle}>Prendre rendez-vous en ligne</Text>
           
           <View style={patientLoginStyles.form}>
             <View style={patientLoginStyles.inputContainer}>
@@ -244,7 +244,7 @@ const PatientLoginScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 patientLoginStyles.button, 
-                (loading || Object.keys(errors).length > 0) && patientLoginStyles.buttonDisabled
+                loading && patientLoginStyles.buttonDisabled
               ]}
               onPress={handleLogin}
               disabled={loading}
