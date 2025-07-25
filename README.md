@@ -67,17 +67,6 @@ npm run android
 npm start
 ```
 
-## Configuration
-
-### Variables d'environnement
-
-Créez un fichier `.env` à la racine du projet pour les variables d'environnement :
-
-```env
-API_BASE_URL=http://localhost:3000/api
-API_TIMEOUT=10000
-```
-
 ### Configuration de l'API
 
 Le fichier `src/config/api.ts` contient toute la configuration de l'API :
