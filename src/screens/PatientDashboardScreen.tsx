@@ -88,6 +88,7 @@ const PatientDashboardScreen: React.FC = () => {
       
       // Se connecter au WebSocket
       await realtimeService.connect();
+      setIsConnected(true);
     } catch (error) {
       console.error('Erreur de connexion temps réel:', error);
     }
@@ -197,7 +198,7 @@ const PatientDashboardScreen: React.FC = () => {
         apiService.getCurrentPatient(),
         apiService.getPatientStatut(),
         apiService.getPatientStatutHistorique(),
-        apiService.getRendezVousActifs(), // Utiliser la nouvelle méthode pour les rendez-vous actifs
+        apiService.getRendezVousActifs(),
         apiService.getNotifications(),
       ]);
 
@@ -233,6 +234,7 @@ const PatientDashboardScreen: React.FC = () => {
     setRefreshing(true);
     await loadPatientData();
     setLastUpdate(new Date());
+    setIsConnected(true);
     setRefreshing(false);
   };
 
@@ -627,6 +629,14 @@ const PatientDashboardScreen: React.FC = () => {
               <MaterialIcons name="history" size={32} color="#9b59b6" />
               <Text style={styles.actionTitle}>Historique</Text>
               <Text style={styles.actionDescription}>Rendez-vous</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => navigateToScreen('services')}
+            >
+              <MaterialIcons name="event" size={32} color="#3498db" />
+              <Text style={styles.actionTitle}>Services</Text>
+              <Text style={styles.actionDescription}>Voir les services</Text>
             </TouchableOpacity>
           </View>
         </View>

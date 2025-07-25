@@ -179,8 +179,8 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
       if (isDateOccupee(date)) {
         console.log(`[BOOK_APPOINTMENT] Date occupée détectée: ${dateStr}`);
         Alert.alert(
-          'Date occupée',
-          'Cette date a déjà des rendez-vous. Veuillez sélectionner une autre date.',
+          'Vous avez déjà pris un rendez-vous pour cette date',
+          'Veuillez sélectionner une autre date.',
           [{ text: 'OK' }]
         );
         return;

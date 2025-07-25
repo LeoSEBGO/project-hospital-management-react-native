@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 export const API_CONFIG = {
   // URL de base de l'API - à adapter selon votre environnement
   BASE_URL: __DEV__ 
-    ? 'http://192.168.11.108:3000/api'  // Pour développement local
+    ? 'http://172.100.0.106:3000/api'  // Pour développement local
     : 'http://localhost:3000/api',
 
   // Timeout des requêtes (en millisecondes)

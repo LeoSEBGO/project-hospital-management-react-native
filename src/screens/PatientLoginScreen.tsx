@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,15 @@ import {
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../contexts/AuthContext';
 import patientLoginStyles from '../styles/screens/PatientLoginScreen.styles';
+import { colors, spacing } from '../styles/common';
+import { 
+  validateEmail, 
+  validatePassword, 
+  ValidationState, 
+  ValidationStates,
+  getValidationBorderColor,
+  getValidationIconColor
+} from '../utils/validation';
 
 // Types pour les erreurs de validation
 interface ValidationErrors {
@@ -25,76 +34,87 @@ const PatientLoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
+  const [validationStates, setValidationStates] = useState<ValidationStates>({
+    email: 'idle',
+    password: 'idle'
+  });
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { patientLogin, loading } = useAuth();
 
-  // Fonction de validation de l'email
-  const validateEmail = (email: string): string | undefined => {
-    if (!email.trim()) {
-      return 'L\'email est requis';
-    }
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      return 'Format d\'email invalide';
-    }
-    
-    if (email.length > 100) {
-      return 'L\'email est trop long (max 100 caractères)';
-    }
-    
-    return undefined;
-  };
 
-  // Fonction de validation du mot de passe
-  const validatePassword = (password: string): string | undefined => {
-    if (!password) {
-      return 'Le mot de passe est requis';
-    }
-    
-    if (password.length < 6) {
-      return 'Le mot de passe doit contenir au moins 6 caractères';
-    }
-    
-    if (password.length > 50) {
-      return 'Le mot de passe est trop long (max 50 caractères)';
-    }
-    
-    return undefined;
-  };
+
+  // Validation en temps réel avec debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (email && validationStates.email === 'idle') {
+        validateField('email');
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [email]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (password && validationStates.password === 'idle') {
+        validateField('password');
+      }
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [password]);
 
   // Fonction de validation générale
   const validateForm = (): boolean => {
     const newErrors: ValidationErrors = {};
+    let isValid = true;
     
     // Valider l'email
     const emailError = validateEmail(email);
     if (emailError) {
       newErrors.email = emailError;
+      setValidationStates(prev => ({ ...prev, email: 'invalid' }));
+      isValid = false;
+    } else {
+      setValidationStates(prev => ({ ...prev, email: 'valid' }));
     }
     
     // Valider le mot de passe
     const passwordError = validatePassword(password);
     if (passwordError) {
       newErrors.password = passwordError;
+      setValidationStates(prev => ({ ...prev, password: 'invalid' }));
+      isValid = false;
+    } else {
+      setValidationStates(prev => ({ ...prev, password: 'valid' }));
     }
     
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return isValid;
   };
 
   // Fonction de nettoyage des erreurs
   const clearErrors = () => {
     setErrors({});
+    setValidationStates({
+      email: 'idle',
+      password: 'idle'
+    });
   };
 
   // Fonction de gestion de la connexion
   const handleLogin = async () => {
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
+    
     // Nettoyer les erreurs précédentes
     clearErrors();
     
     // Valider le formulaire
     if (!validateForm()) {
+      setIsSubmitting(false);
       return;
     }
 
@@ -110,6 +130,11 @@ const PatientLoginScreen: React.FC = () => {
       
       if (error?.message?.includes('Identifiants invalides')) {
         errorMessage = 'Email ou mot de passe incorrect';
+        // Marquer les champs comme invalides
+        setValidationStates({
+          email: 'invalid',
+          password: 'invalid'
+        });
       } else if (error?.message?.includes('Email et mot de passe requis')) {
         errorMessage = 'Veuillez remplir tous les champs';
       } else if (error?.message?.includes('Erreur de connexion réseau')) {
@@ -119,12 +144,16 @@ const PatientLoginScreen: React.FC = () => {
       }
       
       setErrors({ general: errorMessage });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Fonction de gestion du changement d'email
   const handleEmailChange = (text: string) => {
     setEmail(text);
+    setValidationStates(prev => ({ ...prev, email: 'idle' }));
+    
     if (errors.email) {
       setErrors(prev => ({ ...prev, email: undefined }));
     }
@@ -136,6 +165,8 @@ const PatientLoginScreen: React.FC = () => {
   // Fonction de gestion du changement de mot de passe
   const handlePasswordChange = (text: string) => {
     setPassword(text);
+    setValidationStates(prev => ({ ...prev, password: 'idle' }));
+    
     if (errors.password) {
       setErrors(prev => ({ ...prev, password: undefined }));
     }
@@ -146,13 +177,41 @@ const PatientLoginScreen: React.FC = () => {
 
   // Fonction de validation en temps réel
   const validateField = (field: 'email' | 'password') => {
+    setValidationStates(prev => ({ ...prev, [field]: 'validating' }));
+    
     if (field === 'email' && email) {
       const emailError = validateEmail(email);
-      setErrors(prev => ({ ...prev, email: emailError }));
+      if (emailError) {
+        setErrors(prev => ({ ...prev, email: emailError }));
+        setValidationStates(prev => ({ ...prev, email: 'invalid' }));
+      } else {
+        setErrors(prev => ({ ...prev, email: undefined }));
+        setValidationStates(prev => ({ ...prev, email: 'valid' }));
+      }
     } else if (field === 'password' && password) {
       const passwordError = validatePassword(password);
-      setErrors(prev => ({ ...prev, password: passwordError }));
+      if (passwordError) {
+        setErrors(prev => ({ ...prev, password: passwordError }));
+        setValidationStates(prev => ({ ...prev, password: 'invalid' }));
+      } else {
+        setErrors(prev => ({ ...prev, password: undefined }));
+        setValidationStates(prev => ({ ...prev, password: 'valid' }));
+      }
     }
+  };
+
+  // Fonction pour obtenir la couleur de bordure selon l'état de validation
+  const getBorderColor = (field: 'email' | 'password') => {
+    const state = validationStates[field];
+    const hasError = errors[field] || errors.general;
+    return getValidationBorderColor(state, !!hasError, colors);
+  };
+
+  // Fonction pour obtenir la couleur de l'icône selon l'état de validation
+  const getIconColor = (field: 'email' | 'password') => {
+    const state = validationStates[field];
+    const hasError = errors[field] || errors.general;
+    return getValidationIconColor(state, !!hasError, colors);
   };
 
   return (
@@ -170,12 +229,12 @@ const PatientLoginScreen: React.FC = () => {
               <Text style={patientLoginStyles.label}>Email</Text>
               <View style={[
                 patientLoginStyles.inputWrapper,
-                errors.email && { borderColor: '#e74c3c', borderWidth: 1 }
+                { borderColor: getBorderColor('email'), borderWidth: 2 }
               ]}>
                 <MaterialIcons 
                   name="email" 
                   size={20} 
-                  color={errors.email ? '#e74c3c' : '#95a5a6'} 
+                  color={getIconColor('email')} 
                   style={patientLoginStyles.inputIcon} 
                 />
                 <TextInput
@@ -189,6 +248,17 @@ const PatientLoginScreen: React.FC = () => {
                   autoCorrect={false}
                   autoComplete="email"
                 />
+                {validationStates.email === 'valid' && (
+                  <MaterialIcons 
+                    name="check-circle" 
+                    size={20} 
+                    color={colors.success} 
+                    style={{ marginLeft: spacing.sm }}
+                  />
+                )}
+                {validationStates.email === 'validating' && (
+                  <ActivityIndicator size="small" color={colors.warning} style={{ marginLeft: spacing.sm }} />
+                )}
               </View>
               {errors.email && (
                 <Text style={patientLoginStyles.errorText}>{errors.email}</Text>
@@ -199,12 +269,12 @@ const PatientLoginScreen: React.FC = () => {
               <Text style={patientLoginStyles.label}>Mot de passe</Text>
               <View style={[
                 patientLoginStyles.inputWrapper,
-                errors.password && { borderColor: '#e74c3c', borderWidth: 1 }
+                { borderColor: getBorderColor('password'), borderWidth: 2 }
               ]}>
                 <MaterialIcons 
                   name="lock" 
                   size={20} 
-                  color={errors.password ? '#e74c3c' : '#95a5a6'} 
+                  color={getIconColor('password')} 
                   style={patientLoginStyles.inputIcon} 
                 />
                 <TextInput
@@ -225,9 +295,20 @@ const PatientLoginScreen: React.FC = () => {
                   <MaterialIcons 
                     name={showPassword ? "visibility" : "visibility-off"} 
                     size={20} 
-                    color="#95a5a6" 
+                    color={colors.textLight} 
                   />
                 </TouchableOpacity>
+                {validationStates.password === 'valid' && (
+                  <MaterialIcons 
+                    name="check-circle" 
+                    size={20} 
+                    color={colors.success} 
+                    style={{ marginLeft: spacing.sm }}
+                  />
+                )}
+                {validationStates.password === 'validating' && (
+                  <ActivityIndicator size="small" color={colors.warning} style={{ marginLeft: spacing.sm }} />
+                )}
               </View>
               {errors.password && (
                 <Text style={patientLoginStyles.errorText}>{errors.password}</Text>
@@ -237,6 +318,12 @@ const PatientLoginScreen: React.FC = () => {
             {/* Affichage des erreurs générales */}
             {errors.general && (
               <View style={patientLoginStyles.errorContainer}>
+                <MaterialIcons 
+                  name="error" 
+                  size={20} 
+                  color={colors.danger} 
+                  style={{ marginRight: spacing.sm }}
+                />
                 <Text style={patientLoginStyles.errorMessage}>{errors.general}</Text>
               </View>
             )}
@@ -244,12 +331,12 @@ const PatientLoginScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 patientLoginStyles.button, 
-                loading && patientLoginStyles.buttonDisabled
+                (loading || isSubmitting) && patientLoginStyles.buttonDisabled
               ]}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={loading || isSubmitting}
             >
-              {loading ? (
+              {(loading || isSubmitting) ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <>
