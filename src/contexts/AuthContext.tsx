@@ -10,6 +10,7 @@ interface AuthContextType {
   patientLogout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
   validateToken: () => Promise<boolean>;
+  updatePatientData: (patientData: Patient) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -199,6 +200,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updatePatientData = (patientData: Patient) => {
+    setPatient(patientData);
+    AsyncStorage.setItem('patient', JSON.stringify(patientData));
+  };
+
   const value: AuthContextType = {
     isAuthenticated,
     patient,
@@ -207,6 +213,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     patientLogout,
     checkAuthStatus,
     validateToken,
+    updatePatientData,
   };
 
   return (

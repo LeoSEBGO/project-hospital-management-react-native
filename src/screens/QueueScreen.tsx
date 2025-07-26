@@ -31,22 +31,62 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ onBack }) => {
   const loadRendezVousDuJour = async () => {
     try {
       setLoading(true);
+      console.log('[QUEUE_SCREEN] Chargement des rendez-vous actifs...');
+      
       const response = await apiService.getRendezVousActifs();
       if (response.success && response.data) {
-        // Filtrer seulement les rendez-vous d'aujourd'hui
+        console.log('[QUEUE_SCREEN] Rendez-vous reçus:', response.data.length);
+        
+        // Normaliser la date d'aujourd'hui
         const aujourdhui = new Date().toISOString().split('T')[0];
-        const rdvDuJour = response.data.filter((rdv: RendezVous) => 
-          rdv.date_rendez_vous === aujourdhui
-        );
+        console.log('[QUEUE_SCREEN] Date d\'aujourd\'hui:', aujourdhui);
+        
+        // Fonction pour normaliser une date
+        const normalizeDate = (dateInput: string | Date): string => {
+          try {
+            const date = new Date(dateInput);
+            if (isNaN(date.getTime())) {
+              console.warn('[QUEUE_SCREEN] Date invalide:', dateInput);
+              return '';
+            }
+            return date.toISOString().split('T')[0];
+          } catch (error) {
+            console.error('[QUEUE_SCREEN] Erreur lors de la normalisation de la date:', dateInput, error);
+            return '';
+          }
+        };
+        
+        // Filtrer seulement les rendez-vous d'aujourd'hui
+        const rdvDuJour = response.data.filter((rdv: RendezVous) => {
+          if (!rdv.date_rendez_vous) {
+            console.log('[QUEUE_SCREEN] Rendez-vous sans date:', rdv.id);
+            return false;
+          }
+          
+          const normalizedRdvDate = normalizeDate(rdv.date_rendez_vous);
+          const isToday = normalizedRdvDate === aujourdhui;
+          
+          console.log('[QUEUE_SCREEN] Rendez-vous', rdv.id, 'date:', rdv.date_rendez_vous, 'normalisée:', normalizedRdvDate, 'est aujourd\'hui:', isToday);
+          
+          return isToday;
+        });
+        
+        console.log('[QUEUE_SCREEN] Rendez-vous du jour trouvés:', rdvDuJour.length);
+        
         // Trier par heure de rendez-vous
         rdvDuJour.sort((a: RendezVous, b: RendezVous) => {
           if (!a.heure_rendez_vous || !b.heure_rendez_vous) return 0;
           return a.heure_rendez_vous.localeCompare(b.heure_rendez_vous);
         });
+        
         setRendezVousDuJour(rdvDuJour);
+      } else {
+        console.warn('[QUEUE_SCREEN] Échec du chargement des rendez-vous:', response.message);
+        setRendezVousDuJour([]);
       }
     } catch (error) {
-      console.error('Erreur lors du chargement des rendez-vous du jour:', error);
+      console.error('[QUEUE_SCREEN] Erreur lors du chargement des rendez-vous du jour:', error);
+      setRendezVousDuJour([]);
     } finally {
       setLoading(false);
     }

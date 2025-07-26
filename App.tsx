@@ -4,10 +4,11 @@
  * @format
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { StatusBar, StyleSheet, useColorScheme, View, ActivityIndicator } from 'react-native';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import PatientLoginScreen from './src/screens/PatientLoginScreen';
+import PatientRegisterScreen from './src/screens/PatientRegisterScreen';
 import PatientDashboardScreen from './src/screens/PatientDashboardScreen';
 import {SafeAreaView} from 'react-native';
 
@@ -15,6 +16,7 @@ import {SafeAreaView} from 'react-native';
 const AppContent: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
   const isDarkMode = useColorScheme() === 'dark';
+  const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
 
   // Afficher un loader pendant la vérification de l'authentification
   if (loading) {
@@ -31,7 +33,13 @@ const AppContent: React.FC = () => {
         barStyle={isDarkMode ? 'light-content' : 'dark-content'} 
         backgroundColor={isDarkMode ? '#2c3e50' : '#fff'}
       />
-      {isAuthenticated ? <PatientDashboardScreen /> : <PatientLoginScreen />}
+      {isAuthenticated ? (
+        <PatientDashboardScreen />
+      ) : authScreen === 'login' ? (
+        <PatientLoginScreen onNavigateToRegister={() => setAuthScreen('register')} />
+      ) : (
+        <PatientRegisterScreen onBack={() => setAuthScreen('login')} />
+      )}
     </SafeAreaView>
   );
 };

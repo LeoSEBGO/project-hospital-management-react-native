@@ -41,19 +41,15 @@ cd hosmapp
 npm install
 ```
 
-```typescript
-BASE_URL: __DEV__ 
-  ? 'http://localhost:3000/api'  // Développement local
-```
-
 ### 4. Configuration pour Android
 
 Pour le développement Android, vous devrez peut-être modifier l'URL de l'API pour utiliser l'IP de votre machine au lieu de localhost :
 
 ```typescript
 BASE_URL: __DEV__ 
-  ? 'http://192.168.1.100:3000/api'
+  ? 'http://xxx.xxx.x.xxx:3000/api'
 ```
+xxx.xxx.x.xxx = ip de la machine
 
 ### 5. Démarrer l'application
 
@@ -205,16 +201,6 @@ heartbeatInterval: 30000, // 30 secondes
 
 1. Éditer `src/config/api.ts`
 2. Redémarrer l'application si nécessaire
-
-## Tests
-
-```bash
-# Lancer les tests
-npm test
-
-# Lancer les tests en mode watch
-npm run test:watch
-```
 
 ## Build et Déploiement
 

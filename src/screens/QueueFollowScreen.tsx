@@ -25,27 +25,65 @@ const QueueFollowScreen: React.FC<QueueFollowScreenProps> = ({ rendezVous, onBac
 
   useEffect(() => {
     loadQueueData();
+    
+    // Rafraîchir automatiquement toutes les 30 secondes
+    const interval = setInterval(() => {
+      console.log('[QUEUE_FOLLOW] Rafraîchissement automatique des données de file...');
+      loadQueueData();
+    }, 30000);
+    
+    return () => clearInterval(interval);
     // eslint-disable-next-line
   }, [rendezVous]);
 
   const loadQueueData = async () => {
     setLoading(true);
     setError(null);
+    
     try {
-      const response = await apiService.getQueuePosition();
+      console.log('[QUEUE_FOLLOW] Chargement des données de file pour le rendez-vous:', {
+        id: rendezVous.id,
+        service_id: rendezVous.service_id,
+        date: rendezVous.date_rendez_vous,
+        heure: rendezVous.heure_rendez_vous
+      });
+      
+      // Utiliser l'API pour récupérer la position dans la file pour ce service spécifique
+      const response = await apiService.getQueuePosition(rendezVous.service_id, rendezVous.date_rendez_vous);
+      
+      console.log('[QUEUE_FOLLOW] Réponse API:', response);
+      
       if (response.success && response.data) {
-        const pos = response.data.positions.find((p: QueuePosition) => p.serviceId === rendezVous.service_id && p.heureRendezVous === rendezVous.heure_rendez_vous);
+        // Chercher la position correspondant à ce rendez-vous
+        const positions = response.data.positions || [];
+        console.log('[QUEUE_FOLLOW] Positions disponibles:', positions.length);
+        
+        // Chercher la position qui correspond à ce rendez-vous
+        const pos = positions.find((p: QueuePosition) => {
+          const match = p.serviceId === rendezVous.service_id;
+          console.log('[QUEUE_FOLLOW] Comparaison position:', {
+            positionServiceId: p.serviceId,
+            rendezVousServiceId: rendezVous.service_id,
+            match: match
+          });
+          return match;
+        });
+        
         if (pos) {
+          console.log('[QUEUE_FOLLOW] Position trouvée:', pos);
           setQueuePosition(pos);
         } else {
+          console.log('[QUEUE_FOLLOW] Aucune position trouvée pour ce service');
           setQueuePosition(null);
           setError("Aucune information de file trouvée pour ce rendez-vous.");
         }
       } else {
+        console.warn('[QUEUE_FOLLOW] Échec de la récupération des données de file:', response.message);
         setQueuePosition(null);
         setError("Impossible de récupérer la file d'attente.");
       }
     } catch (e) {
+      console.error('[QUEUE_FOLLOW] Erreur lors de la récupération de la file d\'attente:', e);
       setQueuePosition(null);
       setError("Erreur lors de la récupération de la file d'attente.");
     } finally {
@@ -107,6 +145,17 @@ const QueueFollowScreen: React.FC<QueueFollowScreenProps> = ({ rendezVous, onBac
             <Text style={styles.headerTitle}>Suivi de la file</Text>
             <Text style={styles.headerSubtitle}>{rendezVous.service?.nom || 'Service'}</Text>
           </View>
+          <TouchableOpacity 
+            style={{ padding: 8 }}
+            onPress={loadQueueData}
+            disabled={loading}
+          >
+            <MaterialIcons 
+              name="refresh" 
+              size={20} 
+              color={loading ? '#95a5a6' : '#3498db'} 
+            />
+          </TouchableOpacity>
         </View>
       </View>
       <ScrollView
@@ -129,6 +178,33 @@ const QueueFollowScreen: React.FC<QueueFollowScreenProps> = ({ rendezVous, onBac
           </View>
         ) : queuePosition ? (
           <>
+            {/* Statistiques globales */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <MaterialIcons name="analytics" size={20} color="#3498db" />
+                <Text style={styles.sectionTitle}>Statistiques de la File</Text>
+              </View>
+              <View style={styles.serviceCard}>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="people" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Total patients:</Text>
+                  <Text style={styles.detailValue}>{queuePosition.totalPatients}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="schedule" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Temps moyen:</Text>
+                  <Text style={styles.detailValue}>{formatTime(Math.round(queuePosition.tempsEstime / queuePosition.totalPatients))}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="update" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Dernière mise à jour:</Text>
+                  <Text style={styles.detailValue}>
+                    {new Date(queuePosition.updatedAt).toLocaleTimeString('fr-FR')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialIcons name="person" size={20} color="#3498db" />
@@ -140,6 +216,9 @@ const QueueFollowScreen: React.FC<QueueFollowScreenProps> = ({ rendezVous, onBac
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(queuePosition.statut) }]}> 
                   <Text style={styles.statusBadgeText}>{getStatusText(queuePosition.statut)}</Text>
                 </View>
+                <Text style={styles.positionLabel}>
+                  {queuePosition.totalPatients} patients en attente
+                </Text>
               </View>
             </View>
             <View style={styles.section}>
@@ -168,18 +247,49 @@ const QueueFollowScreen: React.FC<QueueFollowScreenProps> = ({ rendezVous, onBac
                   <Text style={styles.timeLabel}>Temps d'attente:</Text>
                   <Text style={styles.timeValue}>{formatTime(queuePosition.tempsAttente)}</Text>
                 </View>
+                {queuePosition.minutesRestantes > 0 && (
+                  <View style={styles.timeRow}>
+                    <MaterialIcons name="update" size={16} color="#7f8c8d" />
+                    <Text style={styles.timeLabel}>Temps restant:</Text>
+                    <Text style={styles.timeValue}>{formatTime(queuePosition.minutesRestantes)}</Text>
+                  </View>
+                )}
               </View>
             </View>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialIcons name="event" size={20} color="#3498db" />
-                <Text style={styles.sectionTitle}>Rendez-vous</Text>
+                <Text style={styles.sectionTitle}>Détails du Rendez-vous</Text>
               </View>
               <View style={styles.serviceCard}>
-                <Text style={styles.serviceName}>{rendezVous.service?.nom || 'Service inconnu'}</Text>
-                <Text style={styles.serviceDescription}>Heure : {rendezVous.heure_rendez_vous}</Text>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="local-hospital" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Service:</Text>
+                  <Text style={styles.detailValue}>{rendezVous.service?.nom || 'Service inconnu'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="event" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailValue}>
+                    {rendezVous.date_rendez_vous ? new Date(rendezVous.date_rendez_vous).toLocaleDateString('fr-FR') : 'Non définie'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="access-time" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Heure:</Text>
+                  <Text style={styles.detailValue}>{rendezVous.heure_rendez_vous || 'Non définie'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <MaterialIcons name="sort" size={16} color="#7f8c8d" />
+                  <Text style={styles.detailLabel}>Rang:</Text>
+                  <Text style={styles.detailValue}>#{rendezVous.rang || 'N/A'}</Text>
+                </View>
                 {rendezVous.motif && (
-                  <Text style={styles.serviceDescription}>Motif : {rendezVous.motif}</Text>
+                  <View style={styles.detailRow}>
+                    <MaterialIcons name="note" size={16} color="#7f8c8d" />
+                    <Text style={styles.detailLabel}>Motif:</Text>
+                    <Text style={styles.detailValue}>{rendezVous.motif}</Text>
+                  </View>
                 )}
               </View>
             </View>

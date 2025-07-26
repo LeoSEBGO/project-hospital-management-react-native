@@ -36,6 +36,16 @@ export const colors = {
   // Couleurs de notification
   notificationUnread: '#3498db',
   notificationRead: '#95a5a6',
+  
+  // Couleurs d'erreur et de succès
+  error: '#e74c3c',
+  errorLight: '#fdf2f2',
+  success: '#27ae60',
+  successLight: '#f0f9f0',
+  
+  // Couleurs d'état
+  disabled: '#bdc3c7',
+  white: '#ffffff',
 };
 
 export default colors; 

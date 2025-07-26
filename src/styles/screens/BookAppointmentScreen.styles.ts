@@ -376,6 +376,9 @@ export default StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
   },
+  loadingHorairesIndicator: {
+    marginLeft: 8,
+  },
   noHorairesContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -415,6 +418,21 @@ export default StyleSheet.create({
   },
   inputErrorText: {
     color: '#e74c3c',
+  },
+  selectedServiceDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f4f8',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  selectedServiceName: {
+    fontSize: 16,
+    color: '#2c3e50',
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 
 }); 

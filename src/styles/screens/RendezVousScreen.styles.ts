@@ -63,6 +63,7 @@ export default StyleSheet.create({
     borderRadius: 6,
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 8,
   },
   newButtonText: {
     color: '#fff',
@@ -70,6 +71,7 @@ export default StyleSheet.create({
     fontWeight: '600',
     marginLeft: 5,
   },
+
   listContainer: {
     padding: 20,
   },

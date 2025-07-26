@@ -19,6 +19,9 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 interface BookAppointmentScreenProps {
   onBack?: () => void;
+  service?: Service;
+  onClose?: () => void;
+  onAppointmentCreated?: () => void;
 }
 
 interface HoraireDisponible {
@@ -27,9 +30,9 @@ interface HoraireDisponible {
   periode: 'matin' | 'apres-midi';
 }
 
-const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack }) => {
+const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, service, onClose, onAppointmentCreated }) => {
   const [services, setServices] = useState<Service[]>([]);
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(service || null);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
@@ -49,6 +52,13 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
   useEffect(() => {
     loadServices();
   }, []);
+
+  // Synchroniser selectedService si la prop service change
+  useEffect(() => {
+    if (service) {
+      setSelectedService(service);
+    }
+  }, [service]);
 
   // Rafraîchissement lors du changement de service ou de date
   useEffect(() => {
@@ -79,10 +89,6 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
         const activeServices = response.data.filter(service => service.actif);
         setServices(activeServices);
         
-        // Sélectionner le premier service par défaut
-        if (activeServices.length > 0 && !selectedService) {
-          setSelectedService(activeServices[0]);
-        }
       } else {
         Alert.alert('Erreur', 'Impossible de charger les services');
       }
@@ -339,7 +345,18 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
           [
             {
               text: 'OK',
-              onPress: () => onBack && onBack(),
+              onPress: () => {
+                // Déclencher le callback pour recharger les données
+                if (onAppointmentCreated) {
+                  onAppointmentCreated();
+                }
+                // Fermer l'écran
+                if (onClose) {
+                  onClose();
+                } else if (onBack) {
+                  onBack();
+                }
+              },
             },
           ]
         );
@@ -414,8 +431,8 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
           </View>
         ) : horairesDisponiblesPeriode.length > 0 ? (
           <View style={styles.timeGrid}>
-            {horairesDisponiblesPeriode.map((horaire, index) => (
-              <View key={index} style={styles.timeItemContainer}>
+            {horairesDisponiblesPeriode.map((horaire) => (
+              <View key={`${periode}-${horaire.heure}`} style={styles.timeItemContainer}>
                 {renderTimeItem({ item: horaire })}
               </View>
             ))}
@@ -471,22 +488,30 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Service *</Text>
-            <TouchableOpacity
-              style={[
-                styles.dateTimeButton,
-                !selectedService && styles.inputError
-              ]}
-              onPress={showServicePickerModal}
-            >
-              <MaterialIcons name="local-hospital" size={20} color={!selectedService ? "#e74c3c" : "#3498db"} />
-              <Text style={[
-                styles.dateTimeButtonText,
-                !selectedService && styles.inputErrorText
-              ]}>
-                {selectedService ? selectedService.nom : 'Sélectionner un service'}
-              </Text>
-              <MaterialIcons name="keyboard-arrow-down" size={20} color="#7f8c8d" />
-            </TouchableOpacity>
+            {!service && (
+              <TouchableOpacity
+                style={[
+                  styles.dateTimeButton,
+                  !selectedService && styles.inputError
+                ]}
+                onPress={showServicePickerModal}
+              >
+                <MaterialIcons name="local-hospital" size={20} color={!selectedService ? "#e74c3c" : "#3498db"} />
+                <Text style={[
+                  styles.dateTimeButtonText,
+                  !selectedService && styles.inputErrorText
+                ]}>
+                  {selectedService ? selectedService.nom : 'Sélectionner un service'}
+                </Text>
+                <MaterialIcons name="keyboard-arrow-down" size={20} color="#7f8c8d" />
+              </TouchableOpacity>
+            )}
+            {service && (
+              <View style={styles.selectedServiceDisplay}>
+                <MaterialIcons name="local-hospital" size={20} color="#3498db" />
+                <Text style={styles.selectedServiceName}>{service.nom}</Text>
+              </View>
+            )}
             {selectedService ? (
               <Text style={styles.helpText}>
                 {selectedService.description}
@@ -658,7 +683,7 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack })
                 {refreshingData ? 'Rafraîchissement...' : `${horairesDisponibles.filter(h => h.disponible).length} créneaux disponibles`}
               </Text>
               {refreshingData && (
-                <ActivityIndicator size="small" color="#27ae60" style={{ marginLeft: 8 }} />
+                <ActivityIndicator size="small" color="#27ae60" style={styles.loadingHorairesIndicator} />
               )}
             </View>
             

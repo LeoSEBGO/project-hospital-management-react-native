@@ -16,7 +16,7 @@ import styles from '../styles/screens/NotificationsScreen.styles';
 
 interface NotificationsScreenProps {
   onBack?: () => void;
-  onNavigateToScreen?: (screen: 'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousHistorique' | 'queue' | 'notifications', params?: any) => void;
+  onNavigateToScreen?: (screen: 'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousHistorique' | 'queue' | 'notifications', params?: any) => Promise<void>;
 }
 
 const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNavigateToScreen }) => {
@@ -108,27 +108,52 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
   };
 
   const handleNotificationPress = async (notification: RealTimeNotification) => {
-    // Marquer comme lu d'abord
-    await markAsRead(notification);
-    
-    // Naviguer vers l'écran approprié selon le type de notification
-    if (onNavigateToScreen) {
-      switch (notification.type) {
-        case 'STATUT_CHANGE':
-          onNavigateToScreen('dashboard');
-          break;
-        case 'QUEUE_UPDATE':
-          onNavigateToScreen('queue');
-          break;
-        case 'RENDEZ_VOUS_REMINDER':
-          onNavigateToScreen('rendezVous');
-          break;
-        case 'GENERAL':
-          // Pour les notifications générales, on reste sur l'écran des notifications
-          break;
-        default:
-          break;
+    try {
+      // Marquer comme lu d'abord
+      await markAsRead(notification);
+      
+      console.log('[NOTIFICATIONS] Navigation depuis notification:', notification.type, notification.data);
+      
+      // Naviguer vers l'écran approprié selon le type de notification
+      if (onNavigateToScreen) {
+        switch (notification.type) {
+          case 'STATUT_CHANGE':
+            onNavigateToScreen('dashboard');
+            break;
+          case 'QUEUE_UPDATE':
+            onNavigateToScreen('queue');
+            break;
+          case 'RENDEZ_VOUS_REMINDER':
+            onNavigateToScreen('rendezVous');
+            break;
+          case 'APPOINTMENT_CREATED':
+          case 'RANK_CHANGED':
+            // Naviguer vers les détails du rendez-vous si l'ID est disponible
+            if (notification.data?.appointmentId) {
+              console.log('[NOTIFICATIONS] Navigation vers rendez-vous détail:', notification.data.appointmentId);
+              await onNavigateToScreen('rendezVousDetail', { 
+                appointmentId: notification.data.appointmentId,
+                serviceId: notification.data.serviceId 
+              });
+            } else {
+              console.log('[NOTIFICATIONS] Pas d\'ID de rendez-vous, navigation vers liste');
+              onNavigateToScreen('rendezVous');
+            }
+            break;
+          case 'ACCOUNT_CREATED':
+            onNavigateToScreen('dashboard');
+            break;
+          case 'GENERAL':
+            // Pour les notifications générales, on reste sur l'écran des notifications
+            break;
+          default:
+            console.log('[NOTIFICATIONS] Type de notification non géré:', notification.type);
+            break;
+        }
       }
+    } catch (error) {
+      console.error('[NOTIFICATIONS] Erreur lors de la navigation:', error);
+      Alert.alert('Erreur', 'Impossible de naviguer vers la destination demandée');
     }
   };
 
@@ -158,8 +183,40 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         return {
           title: 'Rappel de rendez-vous',
           details: [
-            { label: 'Service', value: data.service || 'Non spécifié' },
-            { label: 'Heure', value: data.appointmentTime || 'Non spécifié' }
+            { label: 'Service', value: data.serviceName || 'Non spécifié' },
+            { label: 'Heure', value: data.time || 'Non spécifié' }
+          ]
+        };
+
+      case 'APPOINTMENT_CREATED':
+        return {
+          title: 'Rendez-vous créé',
+          details: [
+            { label: 'Service', value: data.serviceName || 'Non spécifié' },
+            { label: 'Date', value: data.date ? new Date(data.date).toLocaleDateString('fr-FR') : 'Non spécifié' },
+            { label: 'Heure', value: data.time || 'Non spécifié' },
+            { label: 'Position', value: `#${data.rank || 'N/A'}` }
+          ]
+        };
+
+      case 'RANK_CHANGED':
+        return {
+          title: 'Changement de position',
+          details: [
+            { label: 'Service', value: data.serviceName || 'Non spécifié' },
+            { label: 'Ancienne position', value: `#${data.oldRank || 'N/A'}` },
+            { label: 'Nouvelle position', value: `#${data.newRank || 'N/A'}` },
+            { label: 'Temps d\'attente estimé', value: `${data.estimatedWaitTime || 0} min` }
+          ]
+        };
+
+      case 'ACCOUNT_CREATED':
+        return {
+          title: 'Compte créé',
+          details: [
+            { label: 'Nom', value: data.patientName || 'Non spécifié' },
+            { label: 'Email', value: data.email || 'Non spécifié' },
+            { label: 'Service', value: data.serviceId ? `Service #${data.serviceId}` : 'Non spécifié' }
           ]
         };
       
@@ -191,6 +248,12 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         return 'event';
       case 'RENDEZ_VOUS_REMINDER':
         return 'local-hospital';
+      case 'APPOINTMENT_CREATED':
+        return 'event-available';
+      case 'RANK_CHANGED':
+        return 'trending-up';
+      case 'ACCOUNT_CREATED':
+        return 'person-add';
       case 'GENERAL':
         return 'notifications';
       default:
@@ -206,8 +269,14 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         return '#f39c12';
       case 'RENDEZ_VOUS_REMINDER':
         return '#e74c3c';
-      case 'GENERAL':
+      case 'APPOINTMENT_CREATED':
         return '#27ae60';
+      case 'RANK_CHANGED':
+        return '#9b59b6';
+      case 'ACCOUNT_CREATED':
+        return '#1abc9c';
+      case 'GENERAL':
+        return '#95a5a6';
       default:
         return '#95a5a6';
     }
@@ -221,6 +290,12 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         return 'Voir la file d\'attente';
       case 'RENDEZ_VOUS_REMINDER':
         return 'Voir les rendez-vous';
+      case 'APPOINTMENT_CREATED':
+        return 'Voir le rendez-vous';
+      case 'RANK_CHANGED':
+        return 'Voir le rendez-vous';
+      case 'ACCOUNT_CREATED':
+        return 'Voir le tableau de bord';
       case 'GENERAL':
         return 'Voir les détails';
       default:

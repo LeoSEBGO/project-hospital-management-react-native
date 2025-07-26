@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 export const API_CONFIG = {
   // URL de base de l'API
   BASE_URL: __DEV__ 
-    ? 'http://172.100.0.106:3000/api'  // Pour développement local
+    ? 'http://192.168.1.135:3000/api'  // Pour développement local
     : 'http://localhost:3000/api',
 
   // Timeout des requêtes (en millisecondes)
@@ -33,13 +33,14 @@ export const API_CONFIG = {
     },
     // Authentification patient
     PATIENT_AUTH: {
-      LOGIN: '/auth-patient/login',
+      LOGIN: '/mobile-app-patient/login',
+      REGISTER: '/mobile-app-patient/register',
     },
     // Patients
     PATIENTS: {
       LIST: '/patients',
       DETAIL: (id: string|number) => `/patients/${id}`,
-      ME: '/patients/me',
+      ME: '/mobile-app-patient/me',
       CREATE: '/patients',
       UPDATE: (id: string|number) => `/patients/${id}`,
       CHANGE_STATUS: '/patients/change-status',
@@ -47,8 +48,8 @@ export const API_CONFIG = {
     },
     // Services
     SERVICES: {
-      LIST: '/services',
-      DETAIL: (id: string|number) => `/services/${id}`,
+      LIST: '/mobile-app-patient/services',
+      DETAIL: (id: string|number) => `/mobile-app-patient/services/${id}`,
       CREATE: '/services',
       UPDATE: (id: string|number) => `/services/${id}`,
       DELETE: (id: string|number) => `/services/${id}`,
@@ -64,15 +65,15 @@ export const API_CONFIG = {
     },
     // Rendez-vous
     RENDEZ_VOUS: {
-      LIST: '/patients/me/rendez-vous',
-      DETAIL: (id: string|number) => `/patients/me/rendez-vous/${id}`,
-      CREATE: '/patients/me/rendez-vous',
-      UPDATE: (id: string|number) => `/patients/me/rendez-vous/${id}`,
-      DELETE: (id: string|number) => `/patients/me/rendez-vous/${id}`,
-      BY_SERVICE: (serviceId: string|number) => `/rendez-vous/service/${serviceId}`,
-      BY_PATIENT: (patientId: string|number) => `/rendez-vous/patient/${patientId}`,
-      HISTORIQUE: '/rendez-vous/historique',
-      HISTORIQUE_PATIENT: (patientId: string|number) => `/rendez-vous/historique/${patientId}`,
+      LIST: '/mobile-app-patient/me/rendez-vous',
+      DETAIL: (id: string|number) => `/mobile-app-patient/me/rendez-vous/${id}`,
+      CREATE: '/mobile-app-patient/me/rendez-vous',
+      UPDATE: (id: string|number) => `/mobile-app-patient/me/rendez-vous/${id}`,
+      DELETE: (id: string|number) => `/mobile-app-patient/me/rendez-vous/${id}`,
+      BY_SERVICE: (serviceId: string|number) => `/mobile-app-patient/rendez-vous/service/${serviceId}`,
+      HISTORIQUE: '/mobile-app-patient/rendez-vous/historique',
+      HORAIRES_DISPONIBLES: (serviceId: string|number) => `/mobile-app-patient/horaires-disponibles/${serviceId}`,
+      DATES_OCCUPEES: (serviceId: string|number) => `/mobile-app-patient/dates-occupees/${serviceId}`,
     },
     // Staff
     STAFF: {
@@ -85,18 +86,24 @@ export const API_CONFIG = {
     },
     // Notifications
     NOTIFICATIONS: {
-      LIST: '/notifications/me',
-      MARK_READ: (id: string|number) => `/notifications/me/${id}/read`,
-      MARK_ALL_READ: '/notifications/me/read-all',
+      LIST: '/mobile-app-patient/notifications/me',
+      MARK_READ: (id: string|number) => `/mobile-app-patient/notifications/me/${id}/read`,
+      MARK_ALL_READ: '/mobile-app-patient/notifications/me/read-all',
       DELETE: (id: string|number) => `/notifications/me/${id}`,
       DELETE_ALL: '/notifications/me',
     },
     // Queue
     QUEUE: {
-      POSITION: '/patients/me/queue-position',
-      STATS: '/patients/me/queue-stats',
-      JOIN: '/patients/me/queue/join',
-      LEAVE: '/patients/me/queue/leave',
+      POSITION: (serviceId: string|number) => `/mobile-app-patient/queue/position/${serviceId}`,
+      STATS: (serviceId: string|number) => `/mobile-app-patient/queue/stats/${serviceId}`,
+      UPDATE_RANKS: '/mobile-app-patient/queue/update-ranks',
+      JOIN: '/mobile-app-patient/me/queue/join',
+      LEAVE: '/mobile-app-patient/me/queue/leave',
+    },
+    // Staff (pour compatibilité, mais non implémenté pour mobile)
+    STAFF_MOBILE: {
+      BY_SERVICE: (serviceId: string|number) => `/mobile-app-patient/staff/service/${serviceId}`,
+      BY_ID: (id: string|number) => `/mobile-app-patient/staff/${id}`,
     },
     // Divers
     HEALTH: '/health', // à appeler sans /api devant

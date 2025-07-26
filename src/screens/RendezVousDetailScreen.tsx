@@ -16,11 +16,15 @@ import apiService from '../services/api';
 interface RendezVousDetailScreenProps {
   rendezVous: RendezVous;
   onBack: () => void;
+  onEditRendezVous?: () => void;
+  onRendezVousCancelled?: () => void;
 }
 
 const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({ 
   rendezVous, 
-  onBack 
+  onBack,
+  onEditRendezVous,
+  onRendezVousCancelled
 }) => {
   const rendezVousId = rendezVous.id;
 
@@ -88,6 +92,10 @@ const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({
                       text: 'OK',
                       onPress: () => {
                         console.log('[RENDEZ_VOUS_DETAIL] Retour à la liste après annulation');
+                        // Déclencher le callback pour recharger les données
+                        if (onRendezVousCancelled) {
+                          onRendezVousCancelled();
+                        }
                         onBack();
                       }
                     }
@@ -286,13 +294,22 @@ const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({
         {(rendezVous.statut?.nom === 'EN_ATTENTE' || rendezVous.statut?.nom === 'EN_CONSULTATION') && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={handleCancelRendezVous}
-            >
-              <MaterialIcons name="cancel" size={20} color="#fff" />
-              <Text style={styles.cancelButtonText}>Annuler le rendez-vous</Text>
-            </TouchableOpacity>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={onEditRendezVous}
+              >
+                <MaterialIcons name="edit" size={20} color="#fff" />
+                <Text style={styles.editButtonText}>Modifier le motif</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={handleCancelRendezVous}
+              >
+                <MaterialIcons name="cancel" size={20} color="#fff" />
+                <Text style={styles.cancelButtonText}>Annuler le rendez-vous</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>

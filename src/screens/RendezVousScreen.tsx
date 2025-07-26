@@ -29,6 +29,23 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack, onNavigateT
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [currentScreen, setCurrentScreen] = useState<'rendezVous' | 'bookAppointment'>('rendezVous');
 
+  const loadRendezVous = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getRendezVous();
+      
+      if (response.success && response.data) {
+        setRendezVous(response.data);
+      } else {
+        Alert.alert('Erreur', response.message || 'Impossible de charger les rendez-vous');
+      }
+    } catch (error: any) {
+      Alert.alert('Erreur', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadRendezVous();
     setupRealtimeConnection();
@@ -43,7 +60,10 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack, onNavigateT
   }, []);
 
   if (currentScreen === 'bookAppointment') {
-    return <BookAppointmentScreen onBack={() => setCurrentScreen('rendezVous')} />;
+    return <BookAppointmentScreen 
+      onBack={() => setCurrentScreen('rendezVous')} 
+      onAppointmentCreated={loadRendezVous}
+    />;
   }
 
   const setupRealtimeConnection = async () => {
@@ -100,23 +120,6 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack, onNavigateT
   const handleConnectionClose = () => {
     setIsConnected(false);
     console.log('Connexion temps réel fermée');
-  };
-
-  const loadRendezVous = async () => {
-    try {
-      setLoading(true);
-      const response = await apiService.getRendezVous();
-      
-      if (response.success && response.data) {
-        setRendezVous(response.data);
-      } else {
-        Alert.alert('Erreur', response.message || 'Impossible de charger les rendez-vous');
-      }
-    } catch (error: any) {
-      Alert.alert('Erreur', error.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const onRefresh = async () => {
@@ -329,7 +332,7 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack, onNavigateT
         )}
       </View>
 
-      {/* Afficher le bouton d'annulation seulement pour les rendez-vous actifs et annulables */}
+      {/* Affiche le bouton d'annulation seulement pour les rendez-vous actifs et annulables */}
       {item.actif && (item.statut?.nom === 'EN_ATTENTE' || item.statut?.nom === 'EN_CONSULTATION') ? (
         <TouchableOpacity
           style={styles.cancelButton}
@@ -379,6 +382,7 @@ const RendezVousScreen: React.FC<RendezVousScreenProps> = ({ onBack, onNavigateT
           >
             <MaterialIcons name="add" size={20} color="#fff" />
           </TouchableOpacity>
+
         </View>
       </View>
 

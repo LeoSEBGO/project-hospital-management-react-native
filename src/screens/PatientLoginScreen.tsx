@@ -30,7 +30,14 @@ interface ValidationErrors {
   general?: string;
 }
 
-const PatientLoginScreen: React.FC = () => {
+interface PatientLoginScreenProps {
+  onNavigateToRegister?: () => void;
+}
+
+const PatientLoginScreen: React.FC<PatientLoginScreenProps> = ({ onNavigateToRegister }) => {
+  console.log('[LOGIN] PatientLoginScreen rendu');
+  console.log('[LOGIN] onNavigateToRegister reçu:', typeof onNavigateToRegister);
+  console.log('[LOGIN] onNavigateToRegister valeur:', onNavigateToRegister);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -253,11 +260,11 @@ const PatientLoginScreen: React.FC = () => {
                     name="check-circle" 
                     size={20} 
                     color={colors.success} 
-                    style={{ marginLeft: spacing.sm }}
+                    style={patientLoginStyles.loadingIndicator}
                   />
                 )}
                 {validationStates.email === 'validating' && (
-                  <ActivityIndicator size="small" color={colors.warning} style={{ marginLeft: spacing.sm }} />
+                  <ActivityIndicator size="small" color={colors.warning} style={patientLoginStyles.loadingIndicator} />
                 )}
               </View>
               {errors.email && (
@@ -290,7 +297,7 @@ const PatientLoginScreen: React.FC = () => {
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
-                  style={{ padding: 4 }}
+                  style={patientLoginStyles.passwordToggle}
                 >
                   <MaterialIcons 
                     name={showPassword ? "visibility" : "visibility-off"} 
@@ -303,11 +310,11 @@ const PatientLoginScreen: React.FC = () => {
                     name="check-circle" 
                     size={20} 
                     color={colors.success} 
-                    style={{ marginLeft: spacing.sm }}
+                    style={patientLoginStyles.loadingIndicator}
                   />
                 )}
                 {validationStates.password === 'validating' && (
-                  <ActivityIndicator size="small" color={colors.warning} style={{ marginLeft: spacing.sm }} />
+                  <ActivityIndicator size="small" color={colors.warning} style={patientLoginStyles.loadingIndicator} />
                 )}
               </View>
               {errors.password && (
@@ -322,7 +329,7 @@ const PatientLoginScreen: React.FC = () => {
                   name="error" 
                   size={20} 
                   color={colors.danger} 
-                  style={{ marginRight: spacing.sm }}
+                  style={patientLoginStyles.errorIcon}
                 />
                 <Text style={patientLoginStyles.errorMessage}>{errors.general}</Text>
               </View>
@@ -350,6 +357,39 @@ const PatientLoginScreen: React.FC = () => {
               <Text style={patientLoginStyles.infoText}>
                 Connectez-vous avec votre adresse email et votre mot de passe pour suivre votre statut.
               </Text>
+            </View>
+
+            {/* Lien vers l'inscription */}
+            <View style={patientLoginStyles.registerLink}>
+              <Text style={patientLoginStyles.registerText}>
+                Vous n'avez pas de compte ?{' '}
+              </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  console.log('[LOGIN] Bouton S\'inscrire cliqué');
+                  console.log('[LOGIN] onNavigateToRegister type:', typeof onNavigateToRegister);
+                  
+                  if (onNavigateToRegister && typeof onNavigateToRegister === 'function') {
+                    try {
+                      onNavigateToRegister();
+                      console.log('[LOGIN] Navigation vers l\'inscription réussie');
+                    } catch (error) {
+                      console.error('[LOGIN] Erreur lors de la navigation:', error);
+                      Alert.alert('Erreur', 'Impossible de naviguer vers l\'écran d\'inscription');
+                    }
+                  } else {
+                    console.error('[LOGIN] onNavigateToRegister n\'est pas défini ou n\'est pas une fonction');
+                    Alert.alert('Erreur', 'Impossible de naviguer vers l\'écran d\'inscription');
+                  }
+                }}
+                style={patientLoginStyles.registerButton}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="person-add" size={16} color={colors.primary} style={{ marginRight: 4 }} />
+                <Text style={patientLoginStyles.registerLinkText}>
+                  S'inscrire
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

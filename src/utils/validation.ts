@@ -64,6 +64,16 @@ export const validatePhone = (phone: string): string | undefined => {
   return undefined;
 };
 
+// Fonction de validation du contact (exactement 8 chiffres)
+export const validateContact = (contact: string): string | undefined => {
+  const cleanContact = contact.replace(/\D/g, '');
+  
+  if (cleanContact.length !== 8) {
+    return 'Le numéro de contact doit contenir exactement 8 chiffres';
+  }
+  return undefined;
+};
+
 // Types pour les états de validation
 export type ValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
 

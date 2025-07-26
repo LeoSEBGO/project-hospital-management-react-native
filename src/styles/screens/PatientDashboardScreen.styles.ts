@@ -102,6 +102,13 @@ export default StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
+  editButton: {
+    padding: 10,
+    borderRadius: 25,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
   logoutButton: {
     backgroundColor: '#e74c3c',
     paddingHorizontal: 12,
@@ -164,6 +171,28 @@ export default StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 15,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#3498db',
+  },
+  editProfileButtonText: {
+    fontSize: 12,
+    color: '#3498db',
+    fontWeight: '600',
+    marginLeft: 4,
   },
   statutCard: {
     backgroundColor: '#fff',
@@ -278,6 +307,12 @@ export default StyleSheet.create({
     padding: 20,
     alignItems: 'center',
   },
+  loadingText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 10,
+    textAlign: 'center',
+  },
   noDataContainer: {
     padding: 20,
     alignItems: 'center',
@@ -354,7 +389,12 @@ export default StyleSheet.create({
   },
   rendezVousDate: {
     fontSize: 14,
-    color: '#7f8c8d',
+    color: '#2c3e50',
+  },
+  rendezVousHeure: {
+    fontSize: 14,
+    color: '#2c3e50',
+    fontWeight: 'bold',
   },
   rendezVousStatus: {
     paddingHorizontal: 10,

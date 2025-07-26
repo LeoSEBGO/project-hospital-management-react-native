@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator, Alert } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import styles from '../styles/components/ProtectedRoute.styles';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -38,9 +39,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Afficher un loader pendant la vérification de l'authentification
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+      <View style={styles.container}>
         <ActivityIndicator size="large" color="#3498db" />
-        <Text style={{ marginTop: 16, fontSize: 16, color: '#666', textAlign: 'center' }}>
+        <Text style={styles.loadingText}>
           Vérification de l'authentification...
         </Text>
       </View>
@@ -54,18 +55,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
     
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5', paddingHorizontal: 24 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#e74c3c', marginBottom: 16, textAlign: 'center' }}>
-          Accès non autorisé
-        </Text>
-        <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', lineHeight: 24 }}>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorTitle}>Accès non autorisé</Text>
+        <Text style={styles.errorMessage}>
           Vous devez être connecté pour accéder à cette page.
         </Text>
       </View>
     );
   }
 
-  // Si l'utilisateur est authentifié, afficher le contenu protégé
   return <>{children}</>;
 };
 

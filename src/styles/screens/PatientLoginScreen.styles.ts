@@ -132,6 +132,71 @@ export const patientLoginStyles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
+  loadingIndicator: {
+    marginLeft: spacing.sm,
+  },
+  errorIcon: {
+    marginRight: spacing.sm,
+  },
+  passwordToggle: {
+    padding: 4,
+  },
+  
+  // Lien d'inscription
+  registerLink: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  registerText: {
+    fontSize: typography.fontSize.base,
+    color: colors.textSecondary,
+  },
+  registerLinkText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  registerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.backgroundWhite,
+    borderRadius: layout.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  quickRegisterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: spacing.sm,
+    marginBottom: spacing.lg,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  quickRegisterButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: '600',
+    color: colors.white,
+    marginLeft: spacing.sm,
+  },
 });
 
 export default patientLoginStyles; 

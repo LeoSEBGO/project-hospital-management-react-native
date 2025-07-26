@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../contexts/AuthContext';
-import { apiService, Patient, Statut, StatutHistorique, RendezVous, RealTimeNotification } from '../services/api';
+import { apiService, Patient, Statut, StatutHistorique, RendezVous, RealTimeNotification, Service } from '../services/api';
 import realtimeService from '../services/realtime';
 import ServicesScreen from './ServicesScreen';
 import BookAppointmentScreen from './BookAppointmentScreen';
@@ -20,17 +20,21 @@ import RendezVousDetailScreen from './RendezVousDetailScreen';
 import RendezVousHistoriqueScreen from './RendezVousHistoriqueScreen';
 import QueueScreen from './QueueScreen';
 import NotificationsScreen from './NotificationsScreen';
+import PatientLoginScreen from './PatientLoginScreen';
+import PatientRegisterScreen from './PatientRegisterScreen';
+import PatientProfileEditScreen from './PatientProfileEditScreen';
+import RendezVousEditScreen from './RendezVousEditScreen';
 import styles from '../styles/screens/PatientDashboardScreen.styles';
 
 const PatientDashboardScreen: React.FC = () => {
-  const { patient, patientLogout } = useAuth();
+  const { patient, patientLogout, isAuthenticated, loading: authLoading } = useAuth();
   const [currentStatut, setCurrentStatut] = useState<Statut | null>(null);
   const [statutHistorique, setStatutHistorique] = useState<StatutHistorique[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousHistorique' | 'queue' | 'notifications'>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousEdit' | 'rendezVousHistorique' | 'queue' | 'notifications' | 'profileEdit'>('dashboard');
   const [patientData, setPatientData] = useState<Patient | null>(patient);
   const [rendezVous, setRendezVous] = useState<RendezVous[]>([]);
   const [selectedRendezVous, setSelectedRendezVous] = useState<RendezVous | null>(null);
@@ -202,29 +206,67 @@ const PatientDashboardScreen: React.FC = () => {
         apiService.getNotifications(),
       ]);
 
+      console.log('[DASHBOARD] Réponses reçues:', {
+        patient: patientResponse.success,
+        statut: statutResponse.success,
+        historique: historiqueResponse.success,
+        rendezVous: rendezVousResponse.success,
+        notifications: notificationsResponse.success
+      });
+
       if (patientResponse.success && patientResponse.data) {
         setPatientData(patientResponse.data);
+        console.log('[DASHBOARD] Données patient mises à jour');
+      } else {
+        console.warn('[DASHBOARD] Échec du chargement des données patient:', patientResponse.message);
       }
 
       if (statutResponse.success && statutResponse.data) {
         setCurrentStatut(statutResponse.data);
+        console.log('[DASHBOARD] Statut patient mis à jour:', statutResponse.data.nom);
+      } else {
+        console.warn('[DASHBOARD] Échec du chargement du statut:', statutResponse.message);
       }
 
       if (historiqueResponse.success && historiqueResponse.data) {
         setStatutHistorique(historiqueResponse.data);
+        console.log('[DASHBOARD] Historique statut mis à jour:', historiqueResponse.data.length, 'entrées');
+      } else {
+        console.warn('[DASHBOARD] Échec du chargement de l\'historique:', historiqueResponse.message);
       }
 
       if (rendezVousResponse.success && rendezVousResponse.data) {
         setRendezVous(rendezVousResponse.data);
         console.log(`[DASHBOARD] Rendez-vous actifs chargés: ${rendezVousResponse.data.length}`);
+        
+        // Log détaillé des rendez-vous pour débogage
+        rendezVousResponse.data.forEach((rdv: any, index: number) => {
+          console.log(`[DASHBOARD] Rendez-vous ${index + 1}:`, {
+            id: rdv.id,
+            date: rdv.date_rendez_vous,
+            heure: rdv.heure_rendez_vous,
+            service: rdv.service?.nom,
+            statut: rdv.statut?.nom
+          });
+        });
+      } else {
+        console.warn('[DASHBOARD] Échec du chargement des rendez-vous:', rendezVousResponse.message);
+        setRendezVous([]);
       }
 
       if (notificationsResponse.success && notificationsResponse.data) {
         setNotifications(notificationsResponse.data);
+        console.log('[DASHBOARD] Notifications mises à jour:', notificationsResponse.data.length);
+      } else {
+        console.warn('[DASHBOARD] Échec du chargement des notifications:', notificationsResponse.message);
+        setNotifications([]);
       }
 
     } catch (error) {
-      console.error('Erreur lors du chargement des données:', error);
+      console.error('[DASHBOARD] Erreur lors du chargement des données:', error);
+      // Réinitialiser les données en cas d'erreur
+      setRendezVous([]);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -249,7 +291,45 @@ const PatientDashboardScreen: React.FC = () => {
     );
   };
 
-  const navigateToScreen = (screen: typeof currentScreen) => {
+  const navigateToScreen = async (screen: typeof currentScreen, params?: any) => {
+    console.log('[DASHBOARD] Navigation vers:', screen, 'avec params:', params);
+    
+    // Gérer les paramètres de navigation spécifiques
+    if (params) {
+      switch (screen) {
+        case 'rendezVousDetail':
+          if (params.appointmentId) {
+            // Chercher d'abord dans les rendez-vous déjà chargés
+            let targetRendezVous = rendezVous.find(rdv => rdv.id === params.appointmentId);
+            
+            // Si pas trouvé, charger le rendez-vous spécifique depuis l'API
+            if (!targetRendezVous) {
+              try {
+                console.log('[DASHBOARD] Chargement du rendez-vous spécifique:', params.appointmentId);
+                const response = await apiService.getRendezVousById(params.appointmentId);
+                if (response.success && response.data) {
+                  targetRendezVous = response.data;
+                  setSelectedRendezVous(targetRendezVous);
+                } else {
+                  console.error('[DASHBOARD] Impossible de charger le rendez-vous:', params.appointmentId);
+                  Alert.alert('Erreur', 'Impossible de charger les détails du rendez-vous');
+                  return;
+                }
+              } catch (error) {
+                console.error('[DASHBOARD] Erreur lors du chargement du rendez-vous:', error);
+                Alert.alert('Erreur', 'Impossible de charger les détails du rendez-vous');
+                return;
+              }
+            } else {
+              setSelectedRendezVous(targetRendezVous);
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    }
+    
     setCurrentScreen(screen);
   };
 
@@ -262,8 +342,6 @@ const PatientDashboardScreen: React.FC = () => {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   };
 
@@ -274,34 +352,105 @@ const PatientDashboardScreen: React.FC = () => {
     });
   };
 
+  // Fonction pour normaliser une date (retourne YYYY-MM-DD)
+  const normalizeDate = (dateInput: string | Date): string => {
+    try {
+      const date = new Date(dateInput);
+      if (isNaN(date.getTime())) {
+        console.warn('[DASHBOARD] Date invalide:', dateInput);
+        return '';
+      }
+      return date.toISOString().split('T')[0];
+    } catch (error) {
+      console.error('[DASHBOARD] Erreur lors de la normalisation de la date:', dateInput, error);
+      return '';
+    }
+  };
+
   // Fonction pour vérifier si une date est aujourd'hui
-  const isToday = (dateString: string) => {
-    const today = new Date();
-    const date = new Date(dateString);
-    return date.toDateString() === today.toDateString();
+  const isToday = (dateInput: string | Date): boolean => {
+    try {
+      const normalizedDate = normalizeDate(dateInput);
+      if (!normalizedDate) return false;
+      
+      const today = new Date();
+      const todayNormalized = today.toISOString().split('T')[0];
+      
+      console.log('[DASHBOARD] Comparaison dates:', { 
+        input: normalizedDate, 
+        today: todayNormalized, 
+        isEqual: normalizedDate === todayNormalized 
+      });
+      
+      return normalizedDate === todayNormalized;
+    } catch (error) {
+      console.error('[DASHBOARD] Erreur dans isToday:', error);
+      return false;
+    }
   };
 
   // Fonction pour vérifier si une date est dans le futur (après aujourd'hui)
-  const isFutureDate = (dateString: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Réinitialiser l'heure à 00:00:00
-    const date = new Date(dateString);
-    date.setHours(0, 0, 0, 0);
-    return date > today;
+  const isFutureDate = (dateInput: string | Date): boolean => {
+    try {
+      const normalizedDate = normalizeDate(dateInput);
+      if (!normalizedDate) return false;
+      
+      const today = new Date();
+      const todayNormalized = today.toISOString().split('T')[0];
+      
+      console.log('[DASHBOARD] Vérification date future:', { 
+        input: normalizedDate, 
+        today: todayNormalized, 
+        isFuture: normalizedDate > todayNormalized 
+      });
+      
+      return normalizedDate > todayNormalized;
+    } catch (error) {
+      console.error('[DASHBOARD] Erreur dans isFutureDate:', error);
+      return false;
+    }
   };
 
   // Fonction pour filtrer les rendez-vous du jour
   const getRendezVousToday = () => {
-    return rendezVous.filter(rdv => 
-      rdv.date_rendez_vous && isToday(rdv.date_rendez_vous)
-    );
+    console.log('[DASHBOARD] Filtrage rendez-vous du jour...');
+    console.log('[DASHBOARD] Total rendez-vous:', rendezVous.length);
+    
+    const todayRendezVous = rendezVous.filter(rdv => {
+      if (!rdv.date_rendez_vous) {
+        console.log('[DASHBOARD] Rendez-vous sans date:', rdv.id);
+        return false;
+      }
+      
+      const isTodayRdv = isToday(rdv.date_rendez_vous);
+      console.log('[DASHBOARD] Rendez-vous', rdv.id, 'date:', rdv.date_rendez_vous, 'est aujourd\'hui:', isTodayRdv);
+      
+      return isTodayRdv;
+    });
+    
+    console.log('[DASHBOARD] Rendez-vous du jour trouvés:', todayRendezVous.length);
+    return todayRendezVous;
   };
 
   // Fonction pour filtrer les rendez-vous des jours suivants
   const getRendezVousFuture = () => {
-    return rendezVous.filter(rdv => 
-      rdv.date_rendez_vous && isFutureDate(rdv.date_rendez_vous)
-    );
+    console.log('[DASHBOARD] Filtrage rendez-vous futurs...');
+    console.log('[DASHBOARD] Total rendez-vous:', rendezVous.length);
+    
+    const futureRendezVous = rendezVous.filter(rdv => {
+      if (!rdv.date_rendez_vous) {
+        console.log('[DASHBOARD] Rendez-vous sans date:', rdv.id);
+        return false;
+      }
+      
+      const isFutureRdv = isFutureDate(rdv.date_rendez_vous);
+      console.log('[DASHBOARD] Rendez-vous', rdv.id, 'date:', rdv.date_rendez_vous, 'est futur:', isFutureRdv);
+      
+      return isFutureRdv;
+    });
+    
+    console.log('[DASHBOARD] Rendez-vous futurs trouvés:', futureRendezVous.length);
+    return futureRendezVous;
   };
 
   // Helper functions to get statut details
@@ -379,13 +528,40 @@ const PatientDashboardScreen: React.FC = () => {
     navigateToScreen('rendezVousDetail');
   };
 
+  const handleAppointmentBooked = () => {
+    setCurrentScreen('dashboard');
+    loadPatientData();
+  };
+
+
+
+  // Afficher la screen de connexion si l'utilisateur n'est pas authentifié
+  if (!isAuthenticated && !authLoading) {
+    // La navigation login/register est maintenant gérée dans App.tsx
+    return null;
+  }
+
+
+
+  // Afficher un loader pendant la vérification d'authentification
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3498db" />
+          <Text style={styles.loadingText}>Vérification de l'authentification...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Rendu conditionnel selon l'écran actuel
   if (currentScreen === 'services') {
-    return <ServicesScreen onBack={goBackToDashboard} />;
+    return <ServicesScreen onBack={goBackToDashboard} onAppointmentBooked={loadPatientData} />;
   }
 
   if (currentScreen === 'bookAppointment') {
-    return <BookAppointmentScreen onBack={goBackToDashboard} />;
+    return <BookAppointmentScreen onBack={goBackToDashboard} onAppointmentCreated={loadPatientData} />;
   }
 
   if (currentScreen === 'rendezVous') {
@@ -401,7 +577,33 @@ const PatientDashboardScreen: React.FC = () => {
   }
 
   if (currentScreen === 'rendezVousDetail' && selectedRendezVous) {
-    return <RendezVousDetailScreen rendezVous={selectedRendezVous} onBack={goBackToDashboard} />;
+    return <RendezVousDetailScreen 
+      rendezVous={selectedRendezVous} 
+      onBack={goBackToDashboard}
+      onEditRendezVous={() => navigateToScreen('rendezVousEdit')}
+      onRendezVousCancelled={loadPatientData}
+    />;
+  }
+
+  if (currentScreen === 'rendezVousEdit' && selectedRendezVous) {
+    return <RendezVousEditScreen 
+      rendezVous={selectedRendezVous} 
+      onBack={goBackToDashboard} 
+      onRendezVousUpdated={(updatedRendezVous) => {
+        setSelectedRendezVous(updatedRendezVous);
+        // Recharger toutes les données pour s'assurer de la cohérence
+        loadPatientData();
+      }}
+    />;
+  }
+
+  if (currentScreen === 'profileEdit') {
+    return <PatientProfileEditScreen 
+      onBack={goBackToDashboard} 
+      onProfileUpdated={() => {
+        loadPatientData();
+      }}
+    />;
   }
 
   if (currentScreen === 'rendezVousHistorique') {
@@ -485,16 +687,24 @@ const PatientDashboardScreen: React.FC = () => {
           </Text>
         </View>
 
-        {/* Statut actuel -> Liste des rendez-vous */}
+        {/* Rendez-vous du jour */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Rendez-vous du jour</Text>
+          
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#3498db" />
+              <Text style={styles.loadingText}>Chargement des rendez-vous...</Text>
             </View>
-          ) : getRendezVousToday().length > 0 ?
+          ) : getRendezVousToday().length > 0 ? (
             getRendezVousToday()
-              .sort((a, b) => new Date(a.ajoute_le).getTime() - new Date(b.ajoute_le).getTime())
+              .sort((a, b) => {
+                // Trier par heure de rendez-vous si disponible, sinon par date de création
+                if (a.heure_rendez_vous && b.heure_rendez_vous) {
+                  return a.heure_rendez_vous.localeCompare(b.heure_rendez_vous);
+                }
+                return new Date(a.ajoute_le).getTime() - new Date(b.ajoute_le).getTime();
+              })
               .map((rdv) => (
                 <TouchableOpacity 
                   key={rdv.id} 
@@ -507,13 +717,16 @@ const PatientDashboardScreen: React.FC = () => {
                       <Text style={styles.rendezVousDate}>
                         {rdv.date_rendez_vous ? formatDate(rdv.date_rendez_vous) : 'Date à définir'}
                       </Text>
+                      <Text style={styles.rendezVousHeure}>
+                        {rdv.heure_rendez_vous ? rdv.heure_rendez_vous : 'Heure à définir'}
+                      </Text>
                     </View>
                     <View style={[styles.rendezVousStatus, { backgroundColor: getStatusColor(rdv.statut?.nom || '') }]}> 
                       <Text style={styles.rendezVousStatusText}>{getStatusText(rdv.statut?.nom || '')}</Text>
                     </View>
                   </View>
                   <View style={styles.rendezVousDetails}>
-                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang}</Text>
+                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang || 'N/A'}</Text>
                     {rdv.motif && (
                       <Text style={styles.rendezVousComment} numberOfLines={2}>{rdv.motif}</Text>
                     )}
@@ -524,8 +737,9 @@ const PatientDashboardScreen: React.FC = () => {
                   </View>
                 </TouchableOpacity>
               ))
-          : (
+          ) : (
             <View style={styles.noDataContainer}>
+              <MaterialIcons name="event-busy" size={24} color="#95a5a6" />
               <Text style={styles.noDataText}>Aucun rendez-vous aujourd'hui</Text>
             </View>
           )}
@@ -533,7 +747,16 @@ const PatientDashboardScreen: React.FC = () => {
 
         {/* Informations personnelles */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Informations Personnelles</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Informations Personnelles</Text>
+            <TouchableOpacity 
+              style={styles.editProfileButton}
+              onPress={() => navigateToScreen('profileEdit')}
+            >
+              <MaterialIcons name="edit" size={16} color="#3498db" />
+              <Text style={styles.editProfileButtonText}>Modifier</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Nom complet:</Text>
@@ -554,41 +777,6 @@ const PatientDashboardScreen: React.FC = () => {
               </Text>
             </View>
           </View>
-        </View>
-
-        {/* Rendez-vous prochains */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rendez-vous Prochains</Text>
-          {getRendezVousFuture().length > 0 ? (
-            getRendezVousFuture()
-              .sort((a, b) => new Date(a.date_rendez_vous || '').getTime() - new Date(b.date_rendez_vous || '').getTime())
-              .slice(0, 3)
-              .map((rdv) => (
-                <View key={rdv.id} style={styles.rendezVousCard}>
-                  <View style={styles.rendezVousHeader}>
-                    <View style={styles.rendezVousInfo}>
-                      <Text style={styles.rendezVousService}>{rdv.service?.nom || 'Service inconnu'}</Text>
-                      <Text style={styles.rendezVousDate}>
-                        {rdv.date_rendez_vous ? formatDate(rdv.date_rendez_vous) : 'Date à définir'}
-                      </Text>
-                    </View>
-                    <View style={[styles.rendezVousStatus, { backgroundColor: getStatusColor(rdv.statut?.nom || '') }]}>
-                      <Text style={styles.rendezVousStatusText}>{getStatusText(rdv.statut?.nom || '')}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.rendezVousDetails}>
-                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang}</Text>
-                    {rdv.motif && (
-                      <Text style={styles.rendezVousComment}>{rdv.motif}</Text>
-                    )}
-                  </View>
-                </View>
-              ))
-          ) : (
-            <View style={styles.noDataContainer}>
-              <Text style={styles.noDataText}>Aucun rendez-vous à venir</Text>
-            </View>
-          )}
         </View>
 
         {/* Actions rapides */}
@@ -640,6 +828,66 @@ const PatientDashboardScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Rendez-vous à venir */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rendez-vous à venir</Text>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#3498db" />
+              <Text style={styles.loadingText}>Chargement des rendez-vous...</Text>
+            </View>
+          ) : getRendezVousFuture().length > 0 ? (
+            getRendezVousFuture()
+              .sort((a, b) => {
+                // Trier par date de rendez-vous, puis par heure
+                if (a.date_rendez_vous && b.date_rendez_vous) {
+                  const dateA = new Date(a.date_rendez_vous).getTime();
+                  const dateB = new Date(b.date_rendez_vous).getTime();
+                  if (dateA !== dateB) {
+                    return dateA - dateB;
+                  }
+                  // Si même date, trier par heure
+                  if (a.heure_rendez_vous && b.heure_rendez_vous) {
+                    return a.heure_rendez_vous.localeCompare(b.heure_rendez_vous);
+                  }
+                }
+                return new Date(a.ajoute_le).getTime() - new Date(b.ajoute_le).getTime();
+              })
+              .slice(0, 3)
+              .map((rdv) => (
+                <View key={rdv.id} style={styles.rendezVousCard}>
+                  <View style={styles.rendezVousHeader}>
+                    <View style={styles.rendezVousInfo}>
+                      <Text style={styles.rendezVousService}>{rdv.service?.nom || 'Service inconnu'}</Text>
+                      <Text style={styles.rendezVousDate}>
+                        {rdv.date_rendez_vous ? formatDate(rdv.date_rendez_vous) : 'Date à définir'}
+                      </Text>
+                      <Text style={styles.rendezVousHeure}>
+                        {rdv.heure_rendez_vous ? rdv.heure_rendez_vous : 'Heure à définir'}
+                      </Text>
+                    </View>
+                    <View style={[styles.rendezVousStatus, { backgroundColor: getStatusColor(rdv.statut?.nom || '') }]}>
+                      <Text style={styles.rendezVousStatusText}>{getStatusText(rdv.statut?.nom || '')}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.rendezVousDetails}>
+                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang || 'N/A'}</Text>
+                    {rdv.motif && (
+                      <Text style={styles.rendezVousComment}>{rdv.motif}</Text>
+                    )}
+                  </View>
+                </View>
+              ))
+          ) : (
+            <View style={styles.noDataContainer}>
+              <MaterialIcons name="event" size={24} color="#95a5a6" />
+              <Text style={styles.noDataText}>Aucun rendez-vous à venir</Text>
+            </View>
+          )}
+        </View>
+
+
       </ScrollView>
     </SafeAreaView>
   );
