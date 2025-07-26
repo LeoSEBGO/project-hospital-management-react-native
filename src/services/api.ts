@@ -548,15 +548,6 @@ class ApiService {
     }
   }
 
-  async createTestNotifications(): Promise<ApiResponse<RealTimeNotification[]>> {
-    try {
-      const response = await this.api.post('/mobile-app-patient/notifications/me/test');
-      return response.data;
-    } catch (error: any) {
-      throw this.handleError(error);
-    }
-  }
-
   // Méthodes pour les rendez-vous
   async getRendezVous(): Promise<ApiResponse<RendezVous[]>> {
     try {
@@ -697,6 +688,7 @@ class ApiService {
     prenom: string;
     email: string;
     contact?: string;
+    currentPassword: string;
   }): Promise<ApiResponse<Patient>> {
     try {
       const response = await this.api.put(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.PROFILE), data);

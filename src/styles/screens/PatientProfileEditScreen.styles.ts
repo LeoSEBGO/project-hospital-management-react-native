@@ -3,6 +3,7 @@ import { colors, spacing } from '../common';
 
 export default StyleSheet.create({
   container: {
+    marginTop: 20,
     flex: 1,
   },
   scrollView: {
@@ -111,5 +112,17 @@ export default StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  securitySection: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
   },
 }); 

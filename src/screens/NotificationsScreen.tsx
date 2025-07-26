@@ -99,23 +99,6 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
     }
   };
 
-  const createTestNotifications = async () => {
-    try {
-      const response = await apiService.createTestNotifications();
-      
-      if (response.success && response.data) {
-        // Ajouter les nouvelles notifications à la liste
-        setNotifications(prev => [...(response.data || []), ...prev]);
-        notificationService.showSuccessToast(`${response.data?.length || 0} notifications de test créées`);
-        console.log('[NOTIFICATIONS] Notifications de test créées:', response.data);
-      } else {
-        notificationService.handleError(response.message || 'Erreur lors de la création des notifications de test');
-      }
-    } catch (error: any) {
-      console.error('Erreur lors de la création des notifications de test:', error);
-      notificationService.handleError(error, 'création notifications de test');
-    }
-  };
 
   const handleNotificationPress = async (notification: RealTimeNotification) => {
     try {

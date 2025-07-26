@@ -7,25 +7,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { colors, spacing } from '../styles/common';
-import { 
-  validatePassword,
-  ValidationState, 
-  ValidationStates,
-} from '../utils/validation';
-import { useForm } from '../services/formService';
-import { useApi } from '../hooks/useApi';
 import { apiService } from '../services/api';
 import notificationService from '../services/notificationService';
 import { FormField, Header, Button, Card } from '../components';
-
-// Types pour les erreurs de validation
-interface ValidationErrors {
-  oldPassword?: string;
-  newPassword?: string;
-  confirmPassword?: string;
-  general?: string;
-  [key: string]: string | undefined;
-}
 
 interface PatientPasswordChangeScreenProps {
   onBack: () => void;
@@ -36,90 +20,80 @@ const PatientPasswordChangeScreen: React.FC<PatientPasswordChangeScreenProps> = 
   onBack, 
   onPasswordChanged 
 }) => {
-  // Form state management
-  const {
-    formState,
-    setFieldValue,
-    setFieldError,
-    validateField,
-    validateForm,
-    isSubmitting,
-    setIsSubmitting,
-  } = useForm({
+  // Form state
+  const [formData, setFormData] = useState({
     oldPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
-  // API hooks
-  const updatePasswordApi = useApi(apiService.updatePassword);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Validation configurations
-  const validationConfigs = {
-    oldPassword: { 
-      required: true,
-      minLength: 6,
-      customValidation: (value: string) => {
-        if (!value) return 'L\'ancien mot de passe est requis';
-        if (value.length < 6) return 'Le mot de passe doit contenir au moins 6 caractères';
-        return undefined;
-      }
-    },
-    newPassword: { 
-      required: true,
-      minLength: 6,
-      customValidation: (value: string) => {
-        if (!value) return 'Le nouveau mot de passe est requis';
-        const passwordError = validatePassword(value);
-        if (passwordError) return passwordError;
-        return undefined;
-      }
-    },
-    confirmPassword: { 
-      required: true,
-      customValidation: (value: string) => {
-        if (!value) return 'Confirmez votre nouveau mot de passe';
-        if (value !== formState.newPassword.value) {
-          return 'Les mots de passe ne correspondent pas';
-        }
-        return undefined;
-      }
-    },
+  const handleFieldChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleChangePassword = async () => {
-    const { isValid, errors } = validateForm(validationConfigs);
-    
-    if (!isValid) {
+    // Validation simple
+    if (!formData.oldPassword.trim()) {
+      notificationService.showErrorToast('Veuillez saisir votre mot de passe actuel');
       return;
     }
 
-    setIsSubmitting(true);
+    if (!formData.newPassword.trim()) {
+      notificationService.showErrorToast('Veuillez saisir votre nouveau mot de passe');
+      return;
+    }
+
+    if (formData.newPassword.trim().length < 6) {
+      notificationService.showErrorToast('Le nouveau mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    if (formData.newPassword !== formData.confirmPassword) {
+      notificationService.showErrorToast('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    setIsLoading(true);
 
     try {
-      const result = await updatePasswordApi.execute({
-        oldPassword: formState.oldPassword.value,
-        newPassword: formState.newPassword.value
+      console.log('[PASSWORD_CHANGE] Tentative de changement de mot de passe...');
+      
+      const response = await apiService.updatePassword({
+        oldPassword: formData.oldPassword.trim(),
+        newPassword: formData.newPassword.trim()
       });
 
-      if (result) {
+      console.log('[PASSWORD_CHANGE] Réponse API:', response);
+
+      if (response.success) {
         notificationService.handleSuccess(
-          'Votre mot de passe a été modifié avec succès.',
-          false // Afficher une alerte au lieu d'un toast
+          'Mot de passe modifié avec succès',
+          false
         );
         
-        // Exécuter le callback après un délai pour laisser le temps à l'utilisateur de voir le message
+        // Vider le formulaire
+        setFormData({
+          oldPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+        
         setTimeout(() => {
           if (onPasswordChanged) {
             onPasswordChanged();
           }
           onBack();
         }, 1500);
+      } else {
+        notificationService.showErrorToast(response.message || 'Erreur lors du changement de mot de passe');
       }
     } catch (error: any) {
+      console.error('[PASSWORD_CHANGE] Erreur:', error);
       notificationService.handleError(error, 'changement de mot de passe');
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
@@ -139,73 +113,54 @@ const PatientPasswordChangeScreen: React.FC<PatientPasswordChangeScreenProps> = 
         />
 
         <Card>
-          <Text style={{ 
-            fontSize: 16, 
-            color: colors.textPrimary, 
-            marginBottom: spacing.lg,
-            textAlign: 'center'
-          }}>
-            Entrez votre mot de passe actuel et votre nouveau mot de passe
-          </Text>
-
-          <FormField
-            label="Ancien mot de passe *"
-            value={formState.oldPassword.value}
-            onChangeText={(text) => setFieldValue('oldPassword', text)}
-            placeholder="Votre mot de passe actuel"
-            icon="lock"
-            validationState={formState.oldPassword.validationState}
-            error={formState.oldPassword.error}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-
-          <FormField
-            label="Nouveau mot de passe *"
-            value={formState.newPassword.value}
-            onChangeText={(text) => setFieldValue('newPassword', text)}
-            placeholder="Votre nouveau mot de passe"
-            icon="lock-outline"
-            validationState={formState.newPassword.validationState}
-            error={formState.newPassword.error}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-
-          <FormField
-            label="Confirmer le nouveau mot de passe *"
-            value={formState.confirmPassword.value}
-            onChangeText={(text) => setFieldValue('confirmPassword', text)}
-            placeholder="Confirmez votre nouveau mot de passe"
-            icon="lock-outline"
-            validationState={formState.confirmPassword.validationState}
-            error={formState.confirmPassword.error}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-
-          {updatePasswordApi.error && (
-            <View style={{ 
-              flexDirection: 'row', 
-              alignItems: 'center', 
-              backgroundColor: colors.errorLight, 
-              padding: spacing.md, 
-              borderRadius: 8, 
-              marginBottom: spacing.lg 
+          <View style={{ backgroundColor: colors.white, borderRadius: 12, padding: spacing.lg }}>
+            <Text style={{ 
+              fontSize: 16, 
+              color: colors.textPrimary, 
+              marginBottom: spacing.lg,
+              textAlign: 'center'
             }}>
-              <Text style={{ color: colors.danger, fontSize: 14, flex: 1 }}>
-                {updatePasswordApi.error}
-              </Text>
-            </View>
-          )}
+              Entrez votre mot de passe actuel et votre nouveau mot de passe
+            </Text>
 
-          <Button
-            title="Changer le mot de passe"
-            onPress={handleChangePassword}
-            loading={isSubmitting}
-            icon="lock-reset"
-            fullWidth
-          />
+            <FormField
+              label="Mot de passe actuel"
+              value={formData.oldPassword}
+              onChangeText={(text) => handleFieldChange('oldPassword', text)}
+              placeholder="Votre mot de passe actuel"
+              icon="lock"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <FormField
+              label="Nouveau mot de passe"
+              value={formData.newPassword}
+              onChangeText={(text) => handleFieldChange('newPassword', text)}
+              placeholder="Votre nouveau mot de passe (min. 6 caractères)"
+              icon="lock-outline"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <FormField
+              label="Confirmer le nouveau mot de passe"
+              value={formData.confirmPassword}
+              onChangeText={(text) => handleFieldChange('confirmPassword', text)}
+              placeholder="Confirmez votre nouveau mot de passe"
+              icon="lock-outline"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <Button
+              title="Modifier le mot de passe"
+              onPress={handleChangePassword}
+              loading={isLoading}
+              icon="lock-reset"
+              fullWidth
+            />
+          </View>
         </Card>
       </ScrollView>
     </KeyboardAvoidingView>
