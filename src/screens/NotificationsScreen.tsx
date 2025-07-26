@@ -437,11 +437,6 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
             <Text style={styles.markAllText}>Tout marquer comme lu</Text>
           </TouchableOpacity>
         )}
-        
-        <TouchableOpacity style={styles.testButton} onPress={createTestNotifications}>
-          <MaterialIcons name="add" size={16} color="#27ae60" />
-          <Text style={styles.testButtonText}>Créer notifications de test</Text>
-        </TouchableOpacity>
       </View>
 
       <FlatList

@@ -61,16 +61,6 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
     }
   }, [service]);
 
-  // Rafraîchissement lors du changement de service ou de date
-  useEffect(() => {
-    if (selectedService && selectedDate) {
-      setSelectedTime(new Date(selectedDate)); // Réinitialisation
-      loadHorairesDisponibles(); // Rechargement automatique
-    } else {
-      setHorairesDisponibles([]); // Nettoyage
-    }
-  }, [selectedService, selectedDate]);
-
   // Charger les dates occupées quand le service change
   useEffect(() => {
     if (selectedService) {
@@ -79,6 +69,15 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
       setDatesOccupees([]);
     }
   }, [selectedService]);
+
+  // Rafraîchissement lors du changement de date seulement
+  useEffect(() => {
+    if (selectedService && selectedDate) {
+      loadHorairesDisponibles();
+    } else {
+      setHorairesDisponibles([]);
+    }
+  }, [selectedDate]); // Retirer selectedService de la dépendance
 
   const loadServices = async () => {
     try {
@@ -135,6 +134,7 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
   const loadHorairesDisponibles = async () => {
     if (!selectedService) {
       console.log('[BOOK_APPOINTMENT] Pas de service sélectionné, horaires non chargés');
+      setHorairesDisponibles([]);
       return;
     }
 
@@ -164,13 +164,20 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
         }
         
         setHorairesDisponibles(horaires);
+        
+        // Feedback utilisateur si aucun créneau disponible
+        if (disponibles.length === 0) {
+          notificationService.showWarningToast(`Aucun créneau disponible pour ${selectedService.nom} le ${formatDate(selectedDate)}`);
+        }
       } else {
         console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des horaires:', response.message);
         setHorairesDisponibles([]);
+        notificationService.handleError(response.message || 'Erreur lors du chargement des horaires', 'chargement horaires');
       }
     } catch (error: any) {
       console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des horaires:', error);
       setHorairesDisponibles([]);
+      notificationService.handleError(error, 'chargement horaires');
     } finally {
       setLoadingHoraires(false);
     }
@@ -221,11 +228,28 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
     setShowServicePicker(true);
   };
 
-  const selectService = (service: Service) => {
+  const selectService = async (service: Service) => {
     console.log(`[BOOK_APPOINTMENT] Service sélectionné: ${service.nom} (ID: ${service.id})`);
+    
+    // Mettre à jour le service sélectionné
     setSelectedService(service);
     setShowServicePicker(false);
-    // L'useEffect se chargera de recharger les horaires et réinitialiser l'heure
+    
+    // Réinitialiser l'heure sélectionnée
+    setSelectedTime(new Date(selectedDate));
+    
+    // Vider les horaires actuels pendant le chargement
+    setHorairesDisponibles([]);
+    
+    // Recharger immédiatement les horaires pour le nouveau service
+    try {
+      console.log(`[BOOK_APPOINTMENT] Rechargement des horaires pour le nouveau service: ${service.nom}`);
+      await loadHorairesDisponibles();
+      console.log(`[BOOK_APPOINTMENT] Horaires rechargés avec succès pour ${service.nom}`);
+    } catch (error) {
+      console.error(`[BOOK_APPOINTMENT] Erreur lors du rechargement des horaires:`, error);
+      notificationService.handleError(error, 'rechargement horaires service');
+    }
   };
 
   const selectTime = async (heure: string) => {
@@ -306,6 +330,21 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
 
     if (!selectedTime) {
       notificationService.showWarningToast('Veuillez sélectionner une heure');
+      return;
+    }
+
+    // Vérifier qu'il y a des créneaux disponibles
+    const creneauxDisponibles = horairesDisponibles.filter(h => h.disponible);
+    if (creneauxDisponibles.length === 0) {
+      notificationService.showWarningToast(`Aucun créneau disponible pour ${selectedService.nom} le ${formatDate(selectedDate)}`);
+      return;
+    }
+
+    // Vérifier que l'heure sélectionnée est disponible
+    const heureSelectionnee = formatTimeForAPI(selectedTime);
+    const creneauSelectionne = creneauxDisponibles.find(h => h.heure === heureSelectionnee);
+    if (!creneauSelectionne) {
+      notificationService.showWarningToast('Le créneau sélectionné n\'est plus disponible. Veuillez choisir un autre créneau.');
       return;
     }
 
@@ -408,8 +447,10 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
   };
 
   const renderTimeSection = (periode: 'matin' | 'apres-midi') => {
-    // Afficher uniquement les heures disponibles pour cette période
-    const horairesDisponiblesPeriode = horairesDisponibles.filter(h => h.periode === periode && h.disponible);
+    // Afficher tous les créneaux pour cette période (disponibles et occupés)
+    const horairesPeriode = horairesDisponibles.filter(h => h.periode === periode);
+    const horairesDisponiblesPeriode = horairesPeriode.filter(h => h.disponible);
+    const horairesOccupesPeriode = horairesPeriode.filter(h => !h.disponible);
     const titre = periode === 'matin' ? 'Matin (8h-12h)' : 'Après-midi (15h-00h)';
     
     return (
@@ -420,18 +461,31 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
             <ActivityIndicator size="small" color="#3498db" />
             <Text style={styles.loadingHorairesText}>Chargement des horaires...</Text>
           </View>
-        ) : horairesDisponiblesPeriode.length > 0 ? (
+        ) : horairesPeriode.length > 0 ? (
           <View>
             {/* Indicateur des heures disponibles */}
-            <View style={styles.availableHoursIndicator}>
-              <MaterialIcons name="check-circle" size={16} color="#27ae60" />
-              <Text style={styles.availableHoursText}>
-                {horairesDisponiblesPeriode.length} créneau{horairesDisponiblesPeriode.length > 1 ? 'x' : ''} disponible{horairesDisponiblesPeriode.length > 1 ? 's' : ''}
-              </Text>
-            </View>
-            {/* Grille des heures */}
+            {horairesDisponiblesPeriode.length > 0 && (
+              <View style={styles.availableHoursIndicator}>
+                <MaterialIcons name="check-circle" size={16} color="#27ae60" />
+                <Text style={styles.availableHoursText}>
+                  {horairesDisponiblesPeriode.length} créneau{horairesDisponiblesPeriode.length > 1 ? 'x' : ''} disponible{horairesDisponiblesPeriode.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
+            
+            {/* Indicateur des heures occupées */}
+            {horairesOccupesPeriode.length > 0 && (
+              <View style={styles.occupiedHoursIndicator}>
+                <MaterialIcons name="block" size={16} color="#e74c3c" />
+                <Text style={styles.occupiedHoursText}>
+                  {horairesOccupesPeriode.length} créneau{horairesOccupesPeriode.length > 1 ? 'x' : ''} occupé{horairesOccupesPeriode.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
+            
+            {/* Grille des heures - afficher tous les créneaux */}
             <View style={styles.timeGrid}>
-              {horairesDisponiblesPeriode.map((horaire) => (
+              {horairesPeriode.map((horaire) => (
                 <View key={`${periode}-${horaire.heure}`} style={styles.timeItemContainer}>
                   {renderTimeItem({ item: horaire })}
                 </View>
@@ -567,20 +621,24 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
                 !selectedService && styles.dateTimeButtonTextDisabled
               ]}>
                 {loadingHoraires 
-                  ? 'Chargement...' 
+                  ? `Chargement...` 
                   : !selectedService 
                     ? 'Sélectionnez d\'abord un service'
-                    : formatTime(selectedTime)
+                    : horairesDisponibles.length === 0
+                      ? 'Aucun créneau disponible'
+                      : formatTime(selectedTime)
                 }
               </Text>
               <MaterialIcons name="keyboard-arrow-down" size={20} color="#7f8c8d" />
             </TouchableOpacity>
             <Text style={styles.helpText}>
               {loadingHoraires 
-                ? 'Chargement des horaires disponibles...' 
+                ? `Chargement des horaires pour ${selectedService?.nom}...` 
                 : !selectedService 
                   ? 'Sélectionnez d\'abord un service'
-                  : 'Sélectionnez l\'heure de votre rendez-vous'
+                  : horairesDisponibles.length === 0
+                    ? `Aucun créneau disponible pour ${selectedService.nom} le ${formatDate(selectedDate)}`
+                    : 'Sélectionnez l\'heure de votre rendez-vous'
               }
             </Text>
           </View>
