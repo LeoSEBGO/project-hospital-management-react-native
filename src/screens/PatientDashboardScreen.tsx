@@ -593,7 +593,7 @@ const PatientDashboardScreen: React.FC = () => {
                     </View>
                   </View>
                   <View style={styles.rendezVousDetails}>
-                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang || 'N/A'}</Text>
+                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang + 1 || 'N/A'}</Text>
                     {rdv.motif && (
                       <Text style={styles.rendezVousComment} numberOfLines={2}>{rdv.motif}</Text>
                     )}
@@ -739,7 +739,7 @@ const PatientDashboardScreen: React.FC = () => {
                     </View>
                   </View>
                   <View style={styles.rendezVousDetails}>
-                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang || 'N/A'}</Text>
+                    <Text style={styles.rendezVousRank}>Rang: #{rdv.rang + 1 || 'N/A'}</Text>
                     {rdv.motif && (
                       <Text style={styles.rendezVousComment}>{rdv.motif}</Text>
                     )}

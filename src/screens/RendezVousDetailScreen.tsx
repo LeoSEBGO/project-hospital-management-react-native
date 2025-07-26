@@ -249,7 +249,7 @@ const RendezVousDetailScreen: React.FC<RendezVousDetailScreenProps> = ({
               <MaterialIcons name="queue" size={20} color="#3498db" />
               <Text style={styles.infoLabel}>Rang:</Text>
               <View style={styles.rankBadge}>
-                <Text style={styles.rankText}>#{rendezVous.rang}</Text>
+                <Text style={styles.rankText}>#{rendezVous.rang + 1}</Text>
               </View>
             </View>
           </View>

@@ -90,11 +90,8 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
         setServices(activeServices);
         
       } else {
-        Alert.alert('Erreur', 'Impossible de charger les services');
       }
     } catch (error: any) {
-      console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des services:', error);
-      Alert.alert('Erreur', 'Erreur lors du chargement des services');
     } finally {
       setLoadingServices(false);
     }
@@ -107,24 +104,18 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
     }
 
     try {
-      setLoadingDatesOccupees(true);
-      console.log(`[BOOK_APPOINTMENT] Chargement des dates occupées pour le service ${selectedService.nom} (ID: ${selectedService.id})`);
-      
+      setLoadingDatesOccupees(true);      
       const response = await apiService.getDatesOccupees(selectedService.id);
       
       if (response.success && response.data) {
         const dates = response.data.dates;
-        console.log(`[BOOK_APPOINTMENT] Dates occupées chargées: ${dates.length} dates`);
         if (dates.length > 0) {
-          console.log(`[BOOK_APPOINTMENT] Exemples de dates occupées: ${dates.slice(0, 5).join(', ')}`);
         }
         setDatesOccupees(dates);
       } else {
-        console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des dates occupées:', response.message);
         setDatesOccupees([]);
       }
     } catch (error: any) {
-      console.error('[BOOK_APPOINTMENT] Erreur lors du chargement des dates occupées:', error);
       setDatesOccupees([]);
     } finally {
       setLoadingDatesOccupees(false);
