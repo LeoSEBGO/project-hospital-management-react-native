@@ -16,6 +16,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiService, Service, CreateRendezVousRequest } from '../services/api';
 import styles from '../styles/screens/BookAppointmentScreen.styles';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import notificationService from '../services/notificationService';
 
 interface BookAppointmentScreenProps {
   onBack?: () => void;
@@ -294,33 +295,17 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
 
   const handleBookAppointment = async () => {
     if (!selectedService) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un service');
+      notificationService.showWarningToast('Veuillez sélectionner un service');
       return;
     }
 
-    // Vérifier qu'une heure est sélectionnée
-    const heureSelectionnee = formatTimeForAPI(selectedTime);
-    const heureParDefaut = formatTimeForAPI(new Date(selectedDate));
-    
-    if (heureSelectionnee === heureParDefaut) {
-      Alert.alert('Erreur', 'Veuillez sélectionner une heure de rendez-vous');
+    if (!selectedDate) {
+      notificationService.showWarningToast('Veuillez sélectionner une date');
       return;
     }
 
-    // Vérifier que l'heure sélectionnée est disponible
-    const heureDisponible = horairesDisponibles.find(h => h.heure === heureSelectionnee);
-    if (!heureDisponible || !heureDisponible.disponible) {
-      Alert.alert('Erreur', 'Cette heure n\'est plus disponible. Veuillez sélectionner une autre heure.');
-      return;
-    }
-
-    // Vérifier que la date n'est pas dans le passé
-    const now = new Date();
-    const selectedDateTime = new Date(selectedDate);
-    selectedDateTime.setHours(selectedTime.getHours(), selectedTime.getMinutes());
-    
-    if (selectedDateTime <= now) {
-      Alert.alert('Erreur', 'La date et l\'heure du rendez-vous ne peuvent pas être dans le passé');
+    if (!selectedTime) {
+      notificationService.showWarningToast('Veuillez sélectionner une heure');
       return;
     }
 
@@ -339,33 +324,30 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
       const response = await apiService.createRendezVous(rendezVousData);
       
       if (response.success) {
-        Alert.alert(
-          'Succès',
+        notificationService.handleSuccess(
           'Votre rendez-vous a été créé avec succès !',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Déclencher le callback pour recharger les données
-                if (onAppointmentCreated) {
-                  onAppointmentCreated();
-                }
-                // Fermer l'écran
-                if (onClose) {
-                  onClose();
-                } else if (onBack) {
-                  onBack();
-                }
-              },
-            },
-          ]
+          false // Afficher une alerte au lieu d'un toast
         );
+        
+        // Exécuter le callback après un délai pour laisser le temps à l'utilisateur de voir le message
+        setTimeout(() => {
+          // Déclencher le callback pour recharger les données
+          if (onAppointmentCreated) {
+            onAppointmentCreated();
+          }
+          // Fermer l'écran
+          if (onClose) {
+            onClose();
+          } else if (onBack) {
+            onBack();
+          }
+        }, 1500);
       } else {
-        Alert.alert('Erreur', response.message || 'Impossible de créer le rendez-vous');
+        notificationService.handleError(response.message || 'Impossible de créer le rendez-vous', 'création rendez-vous');
       }
     } catch (error: any) {
       console.error('[BOOK_APPOINTMENT] Erreur lors de la création:', error);
-      Alert.alert('Erreur', error.message || 'Erreur lors de la création du rendez-vous');
+      notificationService.handleError(error, 'création rendez-vous');
     } finally {
       setLoading(false);
     }
@@ -393,15 +375,18 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
       <TouchableOpacity
         style={[
           styles.timeItem,
+          item.disponible ? styles.timeItemAvailable : styles.timeItemDisabled,
           isSelected && styles.timeItemSelected
         ]}
-        onPress={() => selectTime(item.heure)}
-        accessibilityLabel={`Sélectionner ${item.heure}`}
-        accessibilityHint="Appuyez pour sélectionner cette heure"
+        onPress={() => item.disponible ? selectTime(item.heure) : null}
+        disabled={!item.disponible}
+        accessibilityLabel={`${item.disponible ? 'Sélectionner' : 'Indisponible'} ${item.heure}`}
+        accessibilityHint={item.disponible ? "Appuyez pour sélectionner cette heure" : "Cette heure n'est pas disponible"}
       >
         <View style={styles.timeItemContent}>
           <Text style={[
             styles.timeItemText,
+            item.disponible ? styles.timeItemTextAvailable : styles.timeItemTextDisabled,
             isSelected && styles.timeItemTextSelected
           ]}>
             {item.heure}
@@ -411,13 +396,19 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
               <MaterialIcons name="check-circle" size={16} color="#27ae60" />
             </View>
           )}
+          {!item.disponible && (
+            <View style={styles.occupiedIndicator}>
+              <MaterialIcons name="block" size={12} color="#e74c3c" />
+              <Text style={styles.occupiedText}>Occupé</Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     );
   };
 
   const renderTimeSection = (periode: 'matin' | 'apres-midi') => {
-    // Filtrer seulement les heures disponibles pour cette période
+    // Afficher uniquement les heures disponibles pour cette période
     const horairesDisponiblesPeriode = horairesDisponibles.filter(h => h.periode === periode && h.disponible);
     const titre = periode === 'matin' ? 'Matin (8h-12h)' : 'Après-midi (15h-00h)';
     
@@ -430,12 +421,22 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
             <Text style={styles.loadingHorairesText}>Chargement des horaires...</Text>
           </View>
         ) : horairesDisponiblesPeriode.length > 0 ? (
-          <View style={styles.timeGrid}>
-            {horairesDisponiblesPeriode.map((horaire) => (
-              <View key={`${periode}-${horaire.heure}`} style={styles.timeItemContainer}>
-                {renderTimeItem({ item: horaire })}
-              </View>
-            ))}
+          <View>
+            {/* Indicateur des heures disponibles */}
+            <View style={styles.availableHoursIndicator}>
+              <MaterialIcons name="check-circle" size={16} color="#27ae60" />
+              <Text style={styles.availableHoursText}>
+                {horairesDisponiblesPeriode.length} créneau{horairesDisponiblesPeriode.length > 1 ? 'x' : ''} disponible{horairesDisponiblesPeriode.length > 1 ? 's' : ''}
+              </Text>
+            </View>
+            {/* Grille des heures */}
+            <View style={styles.timeGrid}>
+              {horairesDisponiblesPeriode.map((horaire) => (
+                <View key={`${periode}-${horaire.heure}`} style={styles.timeItemContainer}>
+                  {renderTimeItem({ item: horaire })}
+                </View>
+              ))}
+            </View>
           </View>
         ) : (
           <View style={styles.noHorairesContainer}>
@@ -699,6 +700,23 @@ const BookAppointmentScreen: React.FC<BookAppointmentScreenProps> = ({ onBack, s
               {renderTimeSection('matin')}
               {renderTimeSection('apres-midi')}
             </ScrollView>
+            
+            {/* Légende des statuts */}
+            <View style={styles.legendContainer}>
+              <Text style={styles.legendTitle}>Légende :</Text>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendIndicator, styles.legendAvailable]} />
+                <Text style={styles.legendText}>Disponible</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendIndicator, styles.legendOccupied]} />
+                <Text style={styles.legendText}>Occupé</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendIndicator, styles.legendSelected]} />
+                <Text style={styles.legendText}>Sélectionné</Text>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>

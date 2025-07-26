@@ -1,6 +1,8 @@
 import { apiService, QueueUpdate, RealTimeNotification, Statut } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from '../config/api';
+import notificationService from './notificationService';
+
 // Types pour les événements temps réel
 export interface RealtimeEvent {
   type: 'QUEUE_UPDATE' | 'STATUT_CHANGE' | 'NOTIFICATION' | 'HEARTBEAT' | 'CONNECTION_CONFIRMED' | 'HEARTBEAT_RESPONSE' | 'RENDEZ_VOUS_UPDATE' | 'GENERAL_NOTIFICATION';
@@ -22,6 +24,7 @@ class RealtimeService {
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private isConnecting = false;
   private listeners: Map<string, Function[]> = new Map();
+  private connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
   
   private config: RealtimeConfig = {
     url: __DEV__ 
@@ -50,24 +53,34 @@ class RealtimeService {
   // Connexion au WebSocket
   async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN || this.isConnecting) {
+      console.log('[REALTIME] Connexion déjà en cours ou établie');
       return;
     }
 
     try {
       this.isConnecting = true;
+      this.connectionStatus = 'connecting';
       
       // Obtenir le token d'authentification
       const token = await this.getAuthToken();
       if (!token) {
         console.log('[REALTIME] Pas de token disponible, connexion annulée');
         this.isConnecting = false;
+        this.connectionStatus = 'error';
+        notificationService.showWarningToast('Connexion temps réel impossible : session expirée');
         return;
       }
 
       console.log('[REALTIME] Tentative de connexion avec token...');
       
       // Créer la connexion WebSocket avec le token
-      this.ws = new WebSocket(`${this.config.url}?token=${token}`);
+      const wsUrl = __DEV__ 
+        ? 'ws://10.208.186.231:3000/ws'
+        : 'wss://10.208.186.231:3000/ws';
+      
+      this.ws = new WebSocket(`${wsUrl}?token=${token}`);
+      
+      console.log('[REALTIME] Tentative de connexion à:', wsUrl);
       
       this.ws.onopen = this.handleOpen.bind(this);
       this.ws.onmessage = (event: any) => this.handleMessage(event);
@@ -75,15 +88,19 @@ class RealtimeService {
       this.ws.onerror = this.handleError.bind(this);
 
     } catch (error) {
-      console.error('Erreur de connexion WebSocket:', error);
+      console.error('[REALTIME] Erreur de connexion WebSocket:', error);
       this.isConnecting = false;
+      this.connectionStatus = 'error';
+      notificationService.handleError(error, 'connexion WebSocket');
       this.scheduleReconnect();
     }
   }
 
   // Déconnexion
   disconnect(): void {
+    console.log('[REALTIME] Déconnexion WebSocket...');
     this.clearTimers();
+    this.connectionStatus = 'disconnected';
     
     if (this.ws) {
       this.ws.close();
@@ -92,15 +109,23 @@ class RealtimeService {
     
     this.isConnecting = false;
     this.reconnectAttempts = 0;
+    console.log('[REALTIME] Déconnexion terminée');
   }
 
   // Gestion de l'ouverture de connexion
   private handleOpen(): void {
-    console.log('Connexion WebSocket établie');
+    console.log('[REALTIME] Connexion WebSocket établie');
     this.isConnecting = false;
+    this.connectionStatus = 'connected';
     this.reconnectAttempts = 0;
     this.startHeartbeat();
     this.emit(this.EVENTS.CONNECTION_OPEN);
+    
+    // Envoyer un message de test pour vérifier la connexion
+    this.sendHeartbeat();
+    
+    // Notifier l'utilisateur de la connexion réussie
+    notificationService.showSuccessToast('Connexion temps réel établie');
   }
 
   // Gestion des messages reçus
@@ -146,31 +171,75 @@ class RealtimeService {
       }
     } catch (error) {
       console.error('[REALTIME] Erreur lors du parsing du message:', error);
+      notificationService.handleError(error, 'parsing message WebSocket');
     }
   }
 
   // Gestion de la fermeture de connexion
   private async handleClose(event: CloseEvent): Promise<void> {
-    console.log('[REALTIME] Connexion WebSocket fermée:', event.code, event.reason);
+    console.log('[REALTIME] Connexion WebSocket fermée:', {
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean
+    });
+    
     this.clearTimers();
+    this.isConnecting = false;
+    this.connectionStatus = 'disconnected';
     this.emit(this.EVENTS.CONNECTION_CLOSE, event);
     
     // Tenter de se reconnecter si ce n'est pas une fermeture volontaire
     if (event.code !== 1000 && this.reconnectAttempts < this.config.maxReconnectAttempts) {
+      console.log(`[REALTIME] Fermeture non volontaire (code: ${event.code}), tentative de reconnexion`);
+      
       // Vérifier si l'utilisateur est toujours authentifié avant de tenter la reconnexion
       const token = await this.getAuthToken();
       if (token) {
         this.scheduleReconnect();
       } else {
         console.log('[REALTIME] Pas de token disponible, reconnexion annulée');
+        notificationService.showWarningToast('Connexion temps réel perdue : session expirée');
       }
+    } else if (event.code === 1000) {
+      console.log('[REALTIME] Fermeture volontaire, pas de reconnexion');
+      notificationService.showInfoToast('Connexion temps réel fermée');
+    } else {
+      console.log(`[REALTIME] Code de fermeture: ${event.code}, pas de reconnexion`);
+      notificationService.showWarningToast('Connexion temps réel perdue');
     }
   }
 
   // Gestion des erreurs
   private handleError(error: Event): void {
-    console.error('Erreur WebSocket:', error);
-    this.emit(this.EVENTS.CONNECTION_ERROR, error);
+    console.error('[REALTIME] Erreur WebSocket:', {
+      type: error.type,
+      target: error.target,
+      timeStamp: error.timeStamp
+    });
+    
+    // Réinitialiser l'état de connexion
+    this.isConnecting = false;
+    this.connectionStatus = 'error';
+    
+    // Déterminer le type d'erreur
+    let errorMessage = 'Erreur WebSocket inconnue';
+    if (error.type === 'error') {
+      errorMessage = 'Impossible de se connecter au serveur WebSocket. Vérifiez que le serveur est démarré.';
+    }
+    
+    this.emit(this.EVENTS.CONNECTION_ERROR, { error, message: errorMessage });
+    
+    // Notifier l'utilisateur de l'erreur
+    notificationService.showErrorToast(errorMessage);
+    
+    // Si c'est une erreur de connexion, tenter de se reconnecter
+    if (this.reconnectAttempts < this.config.maxReconnectAttempts) {
+      console.log(`[REALTIME] Tentative de reconnexion après erreur (${this.reconnectAttempts + 1}/${this.config.maxReconnectAttempts})`);
+      this.scheduleReconnect();
+    } else {
+      console.log('[REALTIME] Nombre maximum de tentatives atteint, arrêt des reconnexions');
+      notificationService.showErrorToast('Impossible de rétablir la connexion temps réel');
+    }
   }
 
   // Programmer une tentative de reconnexion
@@ -179,9 +248,14 @@ class RealtimeService {
       clearTimeout(this.reconnectTimer);
     }
 
+    if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+      console.log('[REALTIME] Nombre maximum de tentatives atteint, arrêt des reconnexions');
+      return;
+    }
+
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectAttempts++;
-      console.log(`[REALTIME] Tentative de reconnexion ${this.reconnectAttempts}/${this.config.maxReconnectAttempts}`);
+      console.log(`[REALTIME] Tentative de reconnexion ${this.reconnectAttempts}/${this.config.maxReconnectAttempts} dans ${this.config.reconnectInterval}ms`);
       
       // Vérifier si l'utilisateur est toujours authentifié avant de tenter la reconnexion
       const token = await this.getAuthToken();
@@ -190,6 +264,13 @@ class RealtimeService {
         return;
       }
       
+      // Vérifier que la connexion n'est pas déjà établie
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        console.log('[REALTIME] Connexion déjà établie, reconnexion annulée');
+        return;
+      }
+      
+      console.log('[REALTIME] Démarrage de la reconnexion...');
       this.connect();
     }, this.config.reconnectInterval);
   }
@@ -229,7 +310,7 @@ class RealtimeService {
     try {
       return await AsyncStorage.getItem('patientToken');
     } catch (error) {
-      console.error('Erreur lors de la récupération du token:', error);
+      console.error('[REALTIME] Erreur lors de la récupération du token:', error);
       return null;
     }
   }
@@ -262,6 +343,7 @@ class RealtimeService {
           callback(data);
         } catch (error) {
           console.error('Erreur dans le callback:', error);
+          notificationService.handleError(error, 'callback événement temps réel');
         }
       });
     }
@@ -274,25 +356,75 @@ class RealtimeService {
 
   // Obtenir le statut de la connexion
   getConnectionStatus(): string {
-    if (!this.ws) return 'disconnected';
-    
-    switch (this.ws.readyState) {
-      case WebSocket.CONNECTING:
-        return 'connecting';
-      case WebSocket.OPEN:
-        return 'connected';
-      case WebSocket.CLOSING:
-        return 'closing';
-      case WebSocket.CLOSED:
-        return 'closed';
-      default:
-        return 'unknown';
-    }
+    return this.connectionStatus;
   }
 
   // Configurer le service
   configure(config: Partial<RealtimeConfig>): void {
     this.config = { ...this.config, ...config };
+  }
+
+  // Tester la connexion WebSocket
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('[REALTIME] Test de connexion WebSocket...');
+      
+      // Vérifier si on a un token
+      const token = await this.getAuthToken();
+      if (!token) {
+        console.log('[REALTIME] Pas de token disponible pour le test');
+        return false;
+      }
+
+      // Si pas connecté, tenter la connexion
+      if (!this.isConnected()) {
+        await this.connect();
+        
+        // Attendre un peu pour voir si la connexion s'établit
+        return new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            const connected = this.isConnected();
+            console.log('[REALTIME] Test de connexion terminé, connecté:', connected);
+            resolve(connected);
+          }, 3000);
+
+          const checkConnection = () => {
+            if (this.isConnected()) {
+              clearTimeout(timeout);
+              console.log('[REALTIME] Connexion WebSocket établie avec succès');
+              resolve(true);
+            } else if (this.getConnectionStatus() === 'connecting') {
+              setTimeout(checkConnection, 100);
+            } else {
+              clearTimeout(timeout);
+              console.log('[REALTIME] Échec de la connexion WebSocket');
+              resolve(false);
+            }
+          };
+          
+          checkConnection();
+        });
+      }
+
+      const connected = this.isConnected();
+      console.log('[REALTIME] Déjà connecté:', connected);
+      return connected;
+    } catch (error) {
+      console.error('[REALTIME] Erreur lors du test de connexion:', error);
+      notificationService.handleError(error, 'test connexion WebSocket');
+      return false;
+    }
+  }
+
+  // Obtenir des informations de débogage
+  getDebugInfo(): any {
+    return {
+      connectionStatus: this.getConnectionStatus(),
+      isConnected: this.isConnected(),
+      reconnectAttempts: this.reconnectAttempts,
+      config: this.config,
+      listeners: Array.from(this.listeners.keys()),
+    };
   }
 }
 

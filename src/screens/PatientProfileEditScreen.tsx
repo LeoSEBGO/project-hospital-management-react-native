@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,13 +12,11 @@ import { colors, spacing } from '../styles/common';
 import { 
   validateEmail, 
   validateContact,
-  validatePassword,
   ValidationState, 
   ValidationStates,
 } from '../utils/validation';
 import { useForm } from '../services/formService';
 import { useApi } from '../hooks/useApi';
-import { useDebounce } from '../hooks/useDebounce';
 import notificationService from '../services/notificationService';
 import { FormField, Header, Button, Card } from '../components';
 
@@ -28,8 +26,6 @@ interface ValidationErrors {
   prenom?: string;
   email?: string;
   contact?: string;
-  oldPassword?: string;
-  newPassword?: string;
   general?: string;
   [key: string]: string | undefined;
 }
@@ -59,28 +55,10 @@ const PatientProfileEditScreen: React.FC<PatientProfileEditScreenProps> = ({
     prenom: patient?.prenom || '',
     email: patient?.email || '',
     contact: patient?.contact || '',
-    oldPassword: '',
-    newPassword: '',
   });
 
   // API hooks
   const updateProfileApi = useApi(apiService.updatePatientProfile);
-  const updatePasswordApi = useApi(apiService.updatePassword);
-  const validatePasswordApi = useApi(apiService.validateOldPassword);
-
-  // State for password validation
-  const [isOldPasswordValid, setIsOldPasswordValid] = useState(false);
-  const [isValidatingOldPassword, setIsValidatingOldPassword] = useState(false);
-
-  // Debounced old password for auto-validation
-  const debouncedOldPassword = useDebounce(formState.oldPassword?.value || '', 2000);
-
-  // Auto-validate old password when debounced value changes
-  useEffect(() => {
-    if (debouncedOldPassword && !isValidatingOldPassword && !isOldPasswordValid) {
-      handleValidateOldPassword();
-    }
-  }, [debouncedOldPassword]);
 
   // Validation configurations
   const validationConfigs = {
@@ -93,56 +71,6 @@ const PatientProfileEditScreen: React.FC<PatientProfileEditScreenProps> = ({
     contact: { 
       customValidation: (value: string) => value ? validateContact(value) : undefined 
     },
-    newPassword: { 
-      customValidation: (value: string) => {
-        if (value && !isOldPasswordValid) {
-          return 'Validez d\'abord votre ancien mot de passe';
-        }
-        return value ? validatePassword(value) : undefined;
-      }
-    },
-  };
-
-  const handleValidateOldPassword = async () => {
-    if (!formState.oldPassword?.value.trim()) {
-      setFieldError('oldPassword', 'L\'ancien mot de passe est requis');
-      setIsOldPasswordValid(false);
-      return false;
-    }
-
-    setIsValidatingOldPassword(true);
-    setFieldValue('oldPassword', formState.oldPassword.value);
-
-    try {
-      const result = await validatePasswordApi.execute(formState.oldPassword.value);
-      
-      if (result) {
-        setIsOldPasswordValid(true);
-        setFieldError('oldPassword', undefined);
-        
-        // Fetch updated profile
-        try {
-          const profileResponse = await apiService.getCurrentPatient();
-          if (profileResponse.success && profileResponse.data && updatePatientData) {
-            updatePatientData(profileResponse.data);
-          }
-        } catch (profileError) {
-          console.log('[PROFILE] Erreur lors du fetch du profil:', profileError);
-        }
-        
-        return true;
-      } else {
-        setIsOldPasswordValid(false);
-        setFieldError('oldPassword', 'L\'ancien mot de passe est incorrect');
-        return false;
-      }
-    } catch (error: any) {
-      setIsOldPasswordValid(false);
-      setFieldError('oldPassword', error.message || 'Erreur de validation');
-      return false;
-    } finally {
-      setIsValidatingOldPassword(false);
-    }
   };
 
   const handleUpdateProfile = async () => {
@@ -167,34 +95,25 @@ const PatientProfileEditScreen: React.FC<PatientProfileEditScreenProps> = ({
         return;
       }
 
-      // Update password if needed
-      if (formState.oldPassword.value && formState.newPassword.value && isOldPasswordValid) {
-        const passwordResult = await updatePasswordApi.execute({
-          oldPassword: formState.oldPassword.value,
-          newPassword: formState.newPassword.value
-        });
-
-        if (!passwordResult) {
-          return;
-        }
-      }
-
       // Update patient data in context
       if (updatePatientData && profileResult) {
         updatePatientData(profileResult);
       }
       
-      notificationService.showSuccess(
+      notificationService.handleSuccess(
         'Vos informations ont été mises à jour avec succès.',
-        () => {
-          if (onProfileUpdated) {
-            onProfileUpdated();
-          }
-          onBack();
-        }
+        false // Afficher une alerte au lieu d'un toast
       );
+      
+      // Exécuter le callback après un délai pour laisser le temps à l'utilisateur de voir le message
+      setTimeout(() => {
+        if (onProfileUpdated) {
+          onProfileUpdated();
+        }
+        onBack();
+      }, 1500);
     } catch (error: any) {
-      notificationService.showError(error.message || 'Erreur de connexion');
+      notificationService.handleError(error, 'mise à jour du profil');
     } finally {
       setIsSubmitting(false);
     }
@@ -261,40 +180,7 @@ const PatientProfileEditScreen: React.FC<PatientProfileEditScreenProps> = ({
             keyboardType="phone-pad"
           />
 
-          <FormField
-            label="Ancien mot de passe"
-            value={formState.oldPassword.value}
-            onChangeText={(text) => setFieldValue('oldPassword', text)}
-            placeholder="Votre mot de passe actuel"
-            icon="lock"
-            validationState={formState.oldPassword.validationState}
-            error={formState.oldPassword.error}
-            secureTextEntry
-            autoCapitalize="none"
-            showValidationButton={true}
-            onValidationPress={handleValidateOldPassword}
-          />
-
-          <FormField
-            label="Nouveau mot de passe"
-            value={formState.newPassword.value}
-            onChangeText={(text) => setFieldValue('newPassword', text)}
-            placeholder="Votre nouveau mot de passe"
-            icon="lock-outline"
-            validationState={formState.newPassword.validationState}
-            error={formState.newPassword.error}
-            secureTextEntry
-            autoCapitalize="none"
-            editable={isOldPasswordValid}
-          />
-
-          {!isOldPasswordValid && formState.oldPassword.value && (
-            <Text style={{ color: colors.warning, fontSize: 12, marginTop: spacing.xs }}>
-              Validez d'abord votre ancien mot de passe
-            </Text>
-          )}
-
-          {(updateProfileApi.error || updatePasswordApi.error) && (
+          {updateProfileApi.error && (
             <View style={{ 
               flexDirection: 'row', 
               alignItems: 'center', 
@@ -304,7 +190,7 @@ const PatientProfileEditScreen: React.FC<PatientProfileEditScreenProps> = ({
               marginBottom: spacing.lg 
             }}>
               <Text style={{ color: colors.danger, fontSize: 14, flex: 1 }}>
-                {updateProfileApi.error || updatePasswordApi.error}
+                {updateProfileApi.error}
               </Text>
             </View>
           )}
@@ -316,6 +202,31 @@ const PatientProfileEditScreen: React.FC<PatientProfileEditScreenProps> = ({
             icon="save"
             fullWidth
           />
+
+          <View style={{ marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border }}>
+            <Text style={{ 
+              fontSize: 16, 
+              fontWeight: '600', 
+              color: colors.textPrimary, 
+              marginBottom: spacing.md 
+            }}>
+              Sécurité
+            </Text>
+            
+            <Button
+              title="Changer le mot de passe"
+              onPress={() => {
+                // Navigation vers l'écran de changement de mot de passe
+                // Cette fonction sera gérée par le parent
+                if (onProfileUpdated) {
+                  onProfileUpdated();
+                }
+              }}
+              icon="lock"
+              variant="outline"
+              fullWidth
+            />
+          </View>
         </Card>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -434,5 +434,46 @@ export default StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 8,
   },
+  legendContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e8e8e8',
+    backgroundColor: '#f8f9fa',
+  },
+  legendTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  legendIndicator: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 1,
+  },
+  legendAvailable: {
+    backgroundColor: '#e8f5e8',
+    borderColor: '#27ae60',
+  },
+  legendOccupied: {
+    backgroundColor: '#ecf0f1',
+    borderColor: '#bdc3c7',
+  },
+  legendSelected: {
+    backgroundColor: '#e8f5e8',
+    borderColor: '#27ae60',
+    borderWidth: 2,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#2c3e50',
+  },
 
 }); 

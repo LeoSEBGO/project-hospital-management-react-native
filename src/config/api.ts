@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 export const API_CONFIG = {
   // URL de base de l'API
   BASE_URL: __DEV__ 
-    ? 'http://192.168.1.135:3000/api'  // Pour développement local
+    ? 'http://10.208.186.231:3000/api'  // Pour développement local
     : 'http://localhost:3000/api',
 
   // Timeout des requêtes (en millisecondes)
@@ -33,14 +33,17 @@ export const API_CONFIG = {
     },
     // Authentification patient
     PATIENT_AUTH: {
-      LOGIN: '/mobile-app-patient/login',
-      REGISTER: '/mobile-app-patient/register',
+      LOGIN: '/auth-patient/login',
+      REGISTER: '/auth-patient/register',
     },
     // Patients
     PATIENTS: {
       LIST: '/patients',
       DETAIL: (id: string|number) => `/patients/${id}`,
       ME: '/mobile-app-patient/me',
+      PROFILE: '/mobile-app-patient/me/profile',
+      VALIDATE_PASSWORD: '/mobile-app-patient/me/validate-password',
+      PASSWORD: '/mobile-app-patient/me/password',
       CREATE: '/patients',
       UPDATE: (id: string|number) => `/patients/${id}`,
       CHANGE_STATUS: '/patients/change-status',
@@ -97,8 +100,8 @@ export const API_CONFIG = {
       POSITION: (serviceId: string|number) => `/mobile-app-patient/queue/position/${serviceId}`,
       STATS: (serviceId: string|number) => `/mobile-app-patient/queue/stats/${serviceId}`,
       UPDATE_RANKS: '/mobile-app-patient/queue/update-ranks',
-      JOIN: '/mobile-app-patient/me/queue/join',
-      LEAVE: '/mobile-app-patient/me/queue/leave',
+      JOIN: '/mobile-app-patient/queue/join',
+      LEAVE: '/mobile-app-patient/queue/leave',
     },
     // Staff (pour compatibilité, mais non implémenté pour mobile)
     STAFF_MOBILE: {

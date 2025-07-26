@@ -7,11 +7,10 @@ import {
   SafeAreaView,
   RefreshControl,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { apiService, RealTimeNotification } from '../services/api';
-import { realtimeService } from '../services/realtime';
+import notificationService from '../services/notificationService';
 import styles from '../styles/screens/NotificationsScreen.styles';
 
 interface NotificationsScreenProps {
@@ -23,47 +22,31 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
   const [notifications, setNotifications] = useState<RealTimeNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
-    setupRealtimeConnection();
-    
-    return () => {
-      // Nettoyer les listeners lors du démontage
-      realtimeService.off('notification', handleNewNotification);
-    };
   }, []);
-
-  const setupRealtimeConnection = async () => {
-    try {
-      // Écouter les nouvelles notifications
-      realtimeService.on('notification', handleNewNotification);
-      
-      // Se connecter au WebSocket si pas déjà connecté
-      if (!realtimeService.isConnected()) {
-        await realtimeService.connect();
-      }
-    } catch (error) {
-      console.error('Erreur de connexion temps réel:', error);
-    }
-  };
-
-  const handleNewNotification = (notification: RealTimeNotification) => {
-    setNotifications(prev => [notification, ...prev]);
-  };
 
   const loadNotifications = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const response = await apiService.getNotifications();
       
       if (response.success && response.data) {
         setNotifications(response.data);
+        console.log(`[NOTIFICATIONS] ${response.data.length} notifications chargées`);
       } else {
-        Alert.alert('Erreur', response.message || 'Impossible de charger les notifications');
+        const errorMessage = response.message || 'Impossible de charger les notifications';
+        setError(errorMessage);
+        notificationService.handleError(errorMessage, 'chargement des notifications');
       }
     } catch (error: any) {
-      Alert.alert('Erreur', error.message);
+      const errorMessage = error.message || 'Erreur de connexion';
+      setError(errorMessage);
+      notificationService.handleError(error, 'chargement des notifications');
     } finally {
       setLoading(false);
     }
@@ -86,9 +69,13 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
             n.id === notification.id ? { ...n, read: true } : n
           )
         );
+        console.log(`[NOTIFICATIONS] Notification ${notification.id} marquée comme lue`);
+      } else {
+        notificationService.handleError(response.message || 'Erreur lors du marquage', 'marquage notification');
       }
     } catch (error: any) {
       console.error('Erreur lors du marquage comme lu:', error);
+      notificationService.handleError(error, 'marquage notification');
     }
   };
 
@@ -101,9 +88,32 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         setNotifications(prev => 
           prev.map(n => ({ ...n, read: true }))
         );
+        notificationService.showSuccessToast('Toutes les notifications ont été marquées comme lues');
+        console.log('[NOTIFICATIONS] Toutes les notifications marquées comme lues');
+      } else {
+        notificationService.handleError(response.message || 'Erreur lors du marquage', 'marquage toutes notifications');
       }
     } catch (error: any) {
       console.error('Erreur lors du marquage de toutes les notifications:', error);
+      notificationService.handleError(error, 'marquage toutes notifications');
+    }
+  };
+
+  const createTestNotifications = async () => {
+    try {
+      const response = await apiService.createTestNotifications();
+      
+      if (response.success && response.data) {
+        // Ajouter les nouvelles notifications à la liste
+        setNotifications(prev => [...(response.data || []), ...prev]);
+        notificationService.showSuccessToast(`${response.data?.length || 0} notifications de test créées`);
+        console.log('[NOTIFICATIONS] Notifications de test créées:', response.data);
+      } else {
+        notificationService.handleError(response.message || 'Erreur lors de la création des notifications de test');
+      }
+    } catch (error: any) {
+      console.error('Erreur lors de la création des notifications de test:', error);
+      notificationService.handleError(error, 'création notifications de test');
     }
   };
 
@@ -148,12 +158,13 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
             break;
           default:
             console.log('[NOTIFICATIONS] Type de notification non géré:', notification.type);
+            notificationService.showWarningToast(`Type de notification non géré: ${notification.type}`);
             break;
         }
       }
     } catch (error) {
       console.error('[NOTIFICATIONS] Erreur lors de la navigation:', error);
-      Alert.alert('Erreur', 'Impossible de naviguer vers la destination demandée');
+      notificationService.handleError(error, 'navigation depuis notification');
     }
   };
 
@@ -409,14 +420,29 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         </Text>
       </View>
 
-      {unreadCount > 0 && (
-        <View style={styles.markAllContainer}>
+      {error && (
+        <View style={styles.errorContainer}>
+          <MaterialIcons name="error" size={20} color="#e74c3c" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadNotifications}>
+            <Text style={styles.retryButtonText}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.actionsContainer}>
+        {unreadCount > 0 && (
           <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
             <MaterialIcons name="done-all" size={16} color="#3498db" />
             <Text style={styles.markAllText}>Tout marquer comme lu</Text>
           </TouchableOpacity>
-        </View>
-      )}
+        )}
+        
+        <TouchableOpacity style={styles.testButton} onPress={createTestNotifications}>
+          <MaterialIcons name="add" size={16} color="#27ae60" />
+          <Text style={styles.testButtonText}>Créer notifications de test</Text>
+        </TouchableOpacity>
+      </View>
 
       <FlatList
         data={notifications}
@@ -432,7 +458,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
             <MaterialIcons name="notifications-none" size={64} color="#bdc3c7" />
             <Text style={styles.emptyTitle}>Aucune notification</Text>
             <Text style={styles.emptyText}>
-              Vous n'avez pas encore reçu de notifications
+              {error ? 'Erreur lors du chargement des notifications' : 'Vous n\'avez pas encore reçu de notifications'}
             </Text>
           </View>
         }

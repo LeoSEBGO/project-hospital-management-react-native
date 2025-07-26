@@ -12,7 +12,6 @@ import {
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService, Patient, Statut, StatutHistorique, RendezVous, RealTimeNotification, Service } from '../services/api';
-import realtimeService from '../services/realtime';
 import ServicesScreen from './ServicesScreen';
 import BookAppointmentScreen from './BookAppointmentScreen';
 import RendezVousScreen from './RendezVousScreen';
@@ -32,7 +31,6 @@ const PatientDashboardScreen: React.FC = () => {
   const [statutHistorique, setStatutHistorique] = useState<StatutHistorique[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'services' | 'bookAppointment' | 'rendezVous' | 'rendezVousDetail' | 'rendezVousEdit' | 'rendezVousHistorique' | 'queue' | 'notifications' | 'profileEdit'>('dashboard');
   const [patientData, setPatientData] = useState<Patient | null>(patient);
@@ -47,151 +45,22 @@ const PatientDashboardScreen: React.FC = () => {
     if (patient && !patient.service) {
       loadPatientData();
     }
-    
-    return () => {
-      // Nettoyer les listeners lors du démontage
-      realtimeService.off('statut_change', handleStatutChange);
-      realtimeService.off('notification', handleNewNotification);
-      realtimeService.off('rendez_vous_update', handleRendezVousUpdate);
-      realtimeService.off('connection_open', handleConnectionOpen);
-      realtimeService.off('connection_close', handleConnectionClose);
-    };
   }, []);
 
-  // Effet pour gérer la connexion realtime uniquement quand l'utilisateur est authentifié
+  // Effet pour charger les données quand l'utilisateur est authentifié
   useEffect(() => {
     if (patient) {
-      // L'utilisateur est authentifié, se connecter au realtime
-      console.log('[DASHBOARD] Utilisateur authentifié, connexion au realtime...');
-      setupRealtimeConnection();
-      setupAutoRefresh();
-    } else {
-      // L'utilisateur n'est pas authentifié, déconnecter le realtime
-      console.log('[DASHBOARD] Utilisateur non authentifié, déconnexion du realtime...');
-      realtimeService.disconnect();
-      setIsConnected(false);
+      // L'utilisateur est authentifié, charger les données
+      console.log('[DASHBOARD] Utilisateur authentifié, chargement des données...');
+      loadPatientData();
     }
   }, [patient]);
 
-  const setupRealtimeConnection = async () => {
-    try {
-      // Vérifier que l'utilisateur est authentifié
-      if (!patient) {
-        console.log('[DASHBOARD] Utilisateur non authentifié, connexion realtime annulée');
-        return;
-      }
 
-      console.log('[DASHBOARD] Configuration de la connexion realtime...');
-      
-      // Écouter les changements de statut et notifications
-      realtimeService.on('statut_change', handleStatutChange);
-      realtimeService.on('notification', handleNewNotification);
-      realtimeService.on('rendez_vous_update', handleRendezVousUpdate);
-      realtimeService.on('connection_open', handleConnectionOpen);
-      realtimeService.on('connection_close', handleConnectionClose);
-      
-      // Se connecter au WebSocket
-      await realtimeService.connect();
-      setIsConnected(true);
-    } catch (error) {
-      console.error('Erreur de connexion temps réel:', error);
-    }
-  };
 
-  const setupAutoRefresh = () => {
-    // Refresh automatique toutes les 30 secondes seulement si connecté
-    const interval = setInterval(() => {
-      if (currentScreen === 'dashboard' && isConnected && patient) {
-        console.log('[DASHBOARD] Refresh automatique...');
-        loadPatientData();
-        setLastUpdate(new Date());
-      }
-    }, 30000); // 30 secondes
 
-    return () => clearInterval(interval);
-  };
 
-  const handleStatutChange = (newStatut: Statut) => {
-    console.log('[DASHBOARD] Nouveau statut reçu:', newStatut);
-    setCurrentStatut(newStatut);
-    setLastUpdate(new Date());
-    
-    // Recharger toutes les données pour avoir les informations les plus récentes
-    loadPatientData();
-    
-    // Afficher une notification à l'utilisateur
-    Alert.alert(
-      'Changement de statut',
-      `Votre statut a été mis à jour : ${getStatutDisplayName(newStatut.nom)}`,
-      [{ text: 'OK' }]
-    );
-  };
 
-  const handleNewNotification = (notification: any) => {
-    console.log('[DASHBOARD] Nouvelle notification reçue:', notification);
-    setLastUpdate(new Date());
-    
-    // Recharger les données si c'est une notification importante
-    if (notification.type === 'STATUT_CHANGE' || notification.type === 'RENDEZ_VOUS_UPDATE') {
-      loadPatientData();
-    }
-    
-    // Afficher une alerte pour les notifications importantes
-    if (notification.type === 'STATUT_CHANGE') {
-      Alert.alert(
-        'Changement de statut',
-        notification.message,
-        [{ text: 'OK' }]
-      );
-    } else if (notification.type === 'RENDEZ_VOUS_UPDATE') {
-      Alert.alert(
-        'Mise à jour de rendez-vous',
-        notification.message,
-        [{ text: 'OK' }]
-      );
-    } else {
-      Alert.alert(
-        'Nouvelle notification',
-        notification.message,
-        [{ text: 'OK' }]
-      );
-    }
-  };
-
-  const handleRendezVousUpdate = (update: any) => {
-    console.log('[DASHBOARD] Rendez-vous mis à jour:', update);
-    setLastUpdate(new Date());
-    
-    // Recharger les données des rendez-vous
-    loadPatientData();
-    
-    // Afficher une notification à l'utilisateur
-    Alert.alert(
-      'Mise à jour de rendez-vous',
-      update.message || 'Votre rendez-vous a été mis à jour',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleConnectionOpen = () => {
-    setIsConnected(true);
-    console.log('[DASHBOARD] Connexion temps réel établie');
-    
-    // Recharger les données une fois connecté pour avoir les plus récentes
-    loadPatientData();
-  };
-
-  const handleConnectionClose = () => {
-    setIsConnected(false);
-    console.log('[DASHBOARD] Connexion temps réel fermée');
-    
-    // Afficher une notification à l'utilisateur
-    Alert.alert(
-      'Connexion perdue',
-      'La connexion temps réel a été perdue. Les mises à jour ne seront plus automatiques.',
-      [{ text: 'OK' }]
-    );
-  };
 
   const loadPatientData = async () => {
     try {
@@ -276,7 +145,6 @@ const PatientDashboardScreen: React.FC = () => {
     setRefreshing(true);
     await loadPatientData();
     setLastUpdate(new Date());
-    setIsConnected(true);
     setRefreshing(false);
   };
 
@@ -624,12 +492,12 @@ const PatientDashboardScreen: React.FC = () => {
         <View style={styles.headerControls}>
           <View style={styles.connectionStatus}>
             <MaterialIcons 
-              name={isConnected ? 'wifi' : 'wifi-off'} 
+              name="wifi" 
               size={14}
-              color={isConnected ? '#27ae60' : '#e74c3c'} 
+              color="#27ae60" 
             />
             <Text style={styles.statusText}>
-              {isConnected ? 'Connecté' : 'Déconnecté'}
+              Connecté
             </Text>
           </View>
           <View style={styles.headerActions}>
@@ -686,7 +554,6 @@ const PatientDashboardScreen: React.FC = () => {
             Dernière mise à jour: {formatLastUpdate(lastUpdate)}
           </Text>
         </View>
-
         {/* Rendez-vous du jour */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Rendez-vous du jour</Text>

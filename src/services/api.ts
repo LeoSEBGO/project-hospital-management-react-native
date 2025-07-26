@@ -365,7 +365,7 @@ class ApiService {
   // Récupérer les informations complètes du patient connecté
   async getCurrentPatient(): Promise<ApiResponse<Patient>> {
     try {
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/me'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.ME));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -376,7 +376,7 @@ class ApiService {
   async getPatientStatut(): Promise<any> {
     try {
       // Le statut est maintenant inclus dans les informations du patient via /me
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/me'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.ME));
       return {
         success: true,
         data: response.data.data?.statut || null
@@ -402,7 +402,7 @@ class ApiService {
   // Méthodes pour les services disponibles (lecture seulement)
   async getServices(): Promise<ApiResponse<Service[]>> {
     try {
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/services'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.SERVICES.LIST));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -411,7 +411,7 @@ class ApiService {
 
   async getService(id: number): Promise<ApiResponse<Service>> {
     try {
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/services/${id}`));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.SERVICES.DETAIL(id)));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -448,13 +448,27 @@ class ApiService {
 
   // Méthode utilitaire pour gérer les erreurs
   private handleError(error: any): Error {
+    console.error('[API] Erreur détaillée:', {
+      message: error.message,
+      code: error.code,
+      response: error.response?.data,
+      status: error.response?.status,
+      url: error.config?.url
+    });
+
     if (error.response) {
       // Erreur de réponse du serveur
-      const message = error.response.data?.message || 'Erreur de serveur';
+      const message = error.response.data?.message || `Erreur serveur (${error.response.status})`;
       return new Error(message);
     } else if (error.request) {
       // Erreur de réseau
-      return new Error('Erreur de connexion réseau');
+      if (error.code === 'ECONNREFUSED') {
+        return new Error('Serveur non accessible. Vérifiez que le serveur est démarré.');
+      } else if (error.code === 'NETWORK_ERROR') {
+        return new Error('Erreur réseau. Vérifiez votre connexion internet.');
+      } else {
+        return new Error(`Erreur de connexion réseau: ${error.message}`);
+      }
     } else {
       // Autre erreur
       return new Error(error.message || 'Erreur inconnue');
@@ -465,7 +479,7 @@ class ApiService {
   async getQueuePosition(serviceId: number = 1, date?: string): Promise<ApiResponse<QueueData>> {
     try {
       const today = date || new Date().toISOString().split('T')[0];
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/queue/position/${serviceId}`), {
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.POSITION(serviceId)), {
         params: { date: today }
       });
       return response.data;
@@ -477,7 +491,7 @@ class ApiService {
   async getQueueStats(serviceId: number = 1, date?: string): Promise<ApiResponse<QueueStats>> {
     try {
       const today = date || new Date().toISOString().split('T')[0];
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/queue/stats/${serviceId}`), {
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.QUEUE.STATS(serviceId)), {
         params: { date: today }
       });
       return response.data;
@@ -509,7 +523,7 @@ class ApiService {
   // Méthodes pour les notifications
   async getNotifications(): Promise<ApiResponse<RealTimeNotification[]>> {
     try {
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/notifications/me'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS.LIST));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -518,7 +532,7 @@ class ApiService {
 
   async markNotificationAsRead(notificationId: number): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.patch(getApiUrl(`/mobile-app-patient/notifications/me/${notificationId}/read`));
+      const response = await this.api.patch(getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS.MARK_READ(notificationId)));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -527,7 +541,16 @@ class ApiService {
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.patch(getApiUrl('/mobile-app-patient/notifications/me/read-all'));
+      const response = await this.api.patch(getApiUrl(API_CONFIG.ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ));
+      return response.data;
+    } catch (error: any) {
+      throw this.handleError(error);
+    }
+  }
+
+  async createTestNotifications(): Promise<ApiResponse<RealTimeNotification[]>> {
+    try {
+      const response = await this.api.post('/mobile-app-patient/notifications/me/test');
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -537,7 +560,7 @@ class ApiService {
   // Méthodes pour les rendez-vous
   async getRendezVous(): Promise<ApiResponse<RendezVous[]>> {
     try {
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/me/rendez-vous'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.LIST));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -546,7 +569,7 @@ class ApiService {
 
   async getRendezVousActifs(): Promise<ApiResponse<RendezVous[]>> {
     try {
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/me/rendez-vous'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.LIST));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -555,7 +578,7 @@ class ApiService {
 
   async getHorairesDisponibles(serviceId: number, date: string): Promise<ApiResponse<any>> {
     try {
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/horaires-disponibles/${serviceId}`), {
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.HORAIRES_DISPONIBLES(serviceId)), {
         params: {
           date: date
         }
@@ -568,7 +591,7 @@ class ApiService {
 
   async getDatesOccupees(serviceId: number): Promise<ApiResponse<any>> {
     try {
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/dates-occupees/${serviceId}`));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.DATES_OCCUPEES(serviceId)));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -577,7 +600,7 @@ class ApiService {
 
   async getRendezVousById(id: number): Promise<ApiResponse<RendezVous>> {
     try {
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/me/rendez-vous/${id}`));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.DETAIL(id)));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -586,7 +609,7 @@ class ApiService {
 
   async createRendezVous(data: CreateRendezVousRequest): Promise<ApiResponse<RendezVous>> {
     try {
-      const response = await this.api.post(getApiUrl('/mobile-app-patient/me/rendez-vous'), data);
+      const response = await this.api.post(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.CREATE), data);
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -595,7 +618,7 @@ class ApiService {
 
   async updateRendezVous(id: number, data: UpdateRendezVousRequest): Promise<ApiResponse<RendezVous>> {
     try {
-      const response = await this.api.put(getApiUrl(`/mobile-app-patient/me/rendez-vous/${id}`), data);
+      const response = await this.api.put(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.UPDATE(id)), data);
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -604,7 +627,7 @@ class ApiService {
 
   async cancelRendezVous(id: number, raison?: string): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.delete(getApiUrl(`/mobile-app-patient/me/rendez-vous/${id}`), {
+      const response = await this.api.delete(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.DELETE(id)), {
         data: { raison_annulation: raison }
       });
       return response.data;
@@ -616,7 +639,7 @@ class ApiService {
   // Récupérer l'historique des rendez-vous
   async getRendezVousHistorique(): Promise<ApiResponse<RendezVousHistorique[]>> {
     try {
-      const response = await this.api.get(getApiUrl('/mobile-app-patient/rendez-vous/historique'));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.HISTORIQUE));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -625,7 +648,7 @@ class ApiService {
 
   async getRendezVousByService(serviceId: number): Promise<ApiResponse<RendezVous[]>> {
     try {
-      const response = await this.api.get(getApiUrl(`/mobile-app-patient/rendez-vous/service/${serviceId}`));
+      const response = await this.api.get(getApiUrl(API_CONFIG.ENDPOINTS.RENDEZ_VOUS.BY_SERVICE(serviceId)));
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -676,7 +699,7 @@ class ApiService {
     contact?: string;
   }): Promise<ApiResponse<Patient>> {
     try {
-      const response = await this.api.put(getApiUrl('/mobile-app-patient/me/profile'), data);
+      const response = await this.api.put(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.PROFILE), data);
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
@@ -685,7 +708,7 @@ class ApiService {
 
   async validateOldPassword(oldPassword: string): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.post(getApiUrl('/mobile-app-patient/me/validate-password'), {
+      const response = await this.api.post(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.VALIDATE_PASSWORD), {
         oldPassword
       });
       return response.data;
@@ -699,7 +722,7 @@ class ApiService {
     newPassword: string;
   }): Promise<ApiResponse<void>> {
     try {
-      const response = await this.api.put(getApiUrl('/mobile-app-patient/me/password'), data);
+      const response = await this.api.put(getApiUrl(API_CONFIG.ENDPOINTS.PATIENTS.PASSWORD), data);
       return response.data;
     } catch (error: any) {
       throw this.handleError(error);
