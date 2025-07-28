@@ -168,7 +168,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
         return {
           title: 'Mise à jour de la file d\'attente',
           details: [
-            { label: 'Position', value: `#${data.position || 'N/A'}` },
+            { label: 'Position', value: `#${data.rang + 1 || 'N/A'}` },
             { label: 'Temps d\'attente estimé', value: `${data.estimatedWait || 0} min` }
           ]
         };
@@ -189,7 +189,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
             { label: 'Service', value: data.serviceName || 'Non spécifié' },
             { label: 'Date', value: data.date ? new Date(data.date).toLocaleDateString('fr-FR') : 'Non spécifié' },
             { label: 'Heure', value: data.time || 'Non spécifié' },
-            { label: 'Position', value: `#${data.rank || 'N/A'}` }
+            { label: 'Position', value: `#${data.rang + 1 || 'N/A'}` }
           ]
         };
 
@@ -198,8 +198,8 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ onBack, onNav
           title: 'Changement de position',
           details: [
             { label: 'Service', value: data.serviceName || 'Non spécifié' },
-            { label: 'Ancienne position', value: `#${data.oldRank || 'N/A'}` },
-            { label: 'Nouvelle position', value: `#${data.newRank || 'N/A'}` },
+            { label: 'Ancienne position', value: `#${data.rang + 1 || 'N/A'}` },
+            { label: 'Nouvelle position', value: `#${data.rang + 1 || 'N/A'}` },
             { label: 'Temps d\'attente estimé', value: `${data.estimatedWaitTime || 0} min` }
           ]
         };

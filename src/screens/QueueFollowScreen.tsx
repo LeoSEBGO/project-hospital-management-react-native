@@ -282,7 +282,7 @@ const QueueFollowScreen: React.FC<QueueFollowScreenProps> = ({ rendezVous, onBac
                 <View style={styles.detailRow}>
                   <MaterialIcons name="sort" size={16} color="#7f8c8d" />
                   <Text style={styles.detailLabel}>Rang:</Text>
-                  <Text style={styles.detailValue}>#{rendezVous.rang || 'N/A'}</Text>
+                  <Text style={styles.detailValue}>#{rendezVous.rang + 1 || 'N/A'}</Text>
                 </View>
                 {rendezVous.motif && (
                   <View style={styles.detailRow}>
